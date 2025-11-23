@@ -176,14 +176,15 @@ async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult, Box
                 let attack_millis = attack_duration.as_millis();
                 
                 // Extract HTTP status code from status line (e.g., "HTTP/1.1 504 Gateway Timeout")
-                // Validate that it's a proper HTTP response before parsing
-                let status_code = if attack_status_line.starts_with("HTTP/") {
-                    attack_status_line
-                        .split_whitespace()
-                        .nth(1)
-                        .and_then(|code| code.parse::<u16>().ok())
-                } else {
-                    None
+                // Validate proper HTTP response format before parsing
+                let status_code = {
+                    let parts: Vec<&str> = attack_status_line.split_whitespace().collect();
+                    if parts.len() >= 2 
+                        && (parts[0].starts_with("HTTP/1.") || parts[0].starts_with("HTTP/2")) {
+                        parts[1].parse::<u16>().ok()
+                    } else {
+                        None
+                    }
                 };
                 
                 // Check for smuggling indicators:
@@ -225,11 +226,26 @@ async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult, Box
             }
             Err(e) => {
                 // Check if error is a timeout error by examining the error chain
-                // tokio timeout errors and IO timeout errors are the main indicators
-                let is_timeout = match e.downcast_ref::<tokio::time::error::Elapsed>() {
-                    Some(_) => true,
-                    None => {
-                        // Fallback to string matching if not a tokio timeout error
+                // Priority: tokio timeout errors, then IO timeout errors, then string fallback
+                let is_timeout = if e.downcast_ref::<tokio::time::error::Elapsed>().is_some() {
+                    true
+                } else {
+                    // Check the error chain for IO timeout errors
+                    let mut source = e.source();
+                    let mut found_io_timeout = false;
+                    while let Some(err) = source {
+                        if let Some(io_err) = err.downcast_ref::<std::io::Error>() 
+                            && io_err.kind() == std::io::ErrorKind::TimedOut {
+                                found_io_timeout = true;
+                                break;
+                            }
+                        source = err.source();
+                    }
+                    
+                    if found_io_timeout {
+                        true
+                    } else {
+                        // Last resort: string matching for other timeout errors
                         let error_str = e.to_string().to_lowercase();
                         error_str.contains("timed out") || error_str.contains("timeout")
                     }

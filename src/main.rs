@@ -13,6 +13,19 @@ use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use url::Url;
 use chrono::Utc;
+use once_cell::sync::Lazy;
+
+// Lazy static TLS configuration to avoid recreating for each request
+static TLS_CONFIG: Lazy<Arc<rustls::ClientConfig>> = Lazy::new(|| {
+    let mut root_store = rustls::RootCertStore::empty();
+    root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    
+    Arc::new(
+        rustls::ClientConfig::builder()
+            .with_root_certificates(root_store)
+            .with_no_client_auth()
+    )
+});
 
 /// HTTP Request Smuggling tester
 #[derive(Parser, Debug)]
@@ -100,14 +113,7 @@ async fn send_request(
     let start = Instant::now();
     
     let response_str = if use_tls {
-        let mut root_store = rustls::RootCertStore::empty();
-        root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-        
-        let config = rustls::ClientConfig::builder()
-            .with_root_certificates(root_store)
-            .with_no_client_auth();
-        
-        let connector = TlsConnector::from(Arc::new(config));
+        let connector = TlsConnector::from(Arc::clone(&TLS_CONFIG));
         let stream = TcpStream::connect(&addr).await?;
         let domain = ServerName::try_from(host.to_string())?;
         let mut tls_stream = connector.connect(domain, stream).await?;
@@ -153,17 +159,17 @@ async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult, Box
     let mut vulnerable = false;
     let mut result_payload_index = None;
     let mut result_attack_status = None;
-    let mut result_attack_duration = None;
+    let mut last_attack_duration = None;
     
     for (i, attack_request) in params.attack_requests.iter().enumerate() {
         match send_request(params.host, params.port, attack_request, params.timeout, params.verbose, params.use_tls).await {
             Ok((attack_response, attack_duration)) => {
+                last_attack_duration = Some(attack_duration); // Track duration of last attempt
                 let attack_status = attack_response.lines().next().unwrap_or("");
                 if attack_response.len() != normal_response.len() || attack_status != normal_status {
                     vulnerable = true;
                     result_payload_index = Some(i);
                     result_attack_status = Some(attack_status.to_string());
-                    result_attack_duration = Some(attack_duration);
                     
                     let result_text = format!("[!] {} Result:", params.check_name);
                     let vulnerable_text = "[!!!] VULNERABLE".red().bold();
@@ -206,10 +212,10 @@ async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult, Box
         check_type: params.check_name.to_string(),
         vulnerable,
         payload_index: result_payload_index,
-        normal_status: normal_status.clone(),
+        normal_status,
         attack_status: result_attack_status,
         normal_duration_ms: normal_duration.as_millis() as u64,
-        attack_duration_ms: result_attack_duration.map(|d| d.as_millis() as u64),
+        attack_duration_ms: last_attack_duration.map(|d| d.as_millis() as u64),
         timestamp: Utc::now().to_rfc3339(),
     })
 }

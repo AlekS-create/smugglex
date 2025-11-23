@@ -762,6 +762,7 @@ dependencies = [
  "clap",
  "colored",
  "indicatif",
+ "once_cell",
  "rustls",
  "rustls-pemfile",
  "serde",

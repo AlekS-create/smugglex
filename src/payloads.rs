@@ -136,22 +136,45 @@ fn get_te_header_variations() -> Vec<String> {
     ];
     te_headers.extend(extended_ascii_patterns);
 
-    // Add whitespace prefix variations with all common control characters
-    for ch in [0x00u8, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x20, 0x7F].iter() {
-        if *ch != 0x09 && *ch != 0x20 {
-            // Skip tab and space as they're already covered
-            te_headers.push(format!("{}Transfer-Encoding: chunked", *ch as char));
+    // Control character constants for header manipulation patterns
+    // These are common control characters used in HTTP request smuggling attacks
+    const NUL: u8 = 0x00;  // Null byte - can cause early string termination in some parsers
+    const TAB: u8 = 0x09;  // Horizontal tab - valid HTTP whitespace
+    const LF: u8 = 0x0A;   // Line feed - HTTP line separator
+    const VT: u8 = 0x0B;   // Vertical tab - not valid HTTP whitespace, but sometimes accepted
+    const FF: u8 = 0x0C;   // Form feed - not valid HTTP whitespace, but sometimes accepted
+    const CR: u8 = 0x0D;   // Carriage return - HTTP line separator
+    const SP: u8 = 0x20;   // Space - valid HTTP whitespace
+    const DEL: u8 = 0x7F;  // Delete character - can cause parsing issues
+
+    // Add whitespace prefix variations with common control characters
+    // These test how parsers handle control characters before header names
+    for ch in [NUL, TAB, LF, VT, FF, CR, SP, DEL].iter() {
+        if *ch != TAB && *ch != SP {
+            // Skip tab and space as they're already covered in basic variations
+            te_headers.push(format!(
+                "{}Transfer-Encoding: chunked",
+                String::from_utf8_lossy(&[*ch])
+            ));
         }
     }
 
-    // Add suffix variations with control characters
-    for ch in [0x00u8, 0x09, 0x0B, 0x0C, 0x7F].iter() {
-        te_headers.push(format!("Transfer-Encoding: chunked{}", *ch as char));
+    // Add suffix variations with control characters after the value
+    // These test how parsers handle trailing control characters
+    for ch in [NUL, TAB, VT, FF, DEL].iter() {
+        te_headers.push(format!(
+            "Transfer-Encoding: chunked{}",
+            String::from_utf8_lossy(&[*ch])
+        ));
     }
 
-    // Add header name suffix variations (before colon)
-    for ch in [0x00u8, 0x09, 0x0B, 0x0C, 0x7F].iter() {
-        te_headers.push(format!("Transfer-Encoding{}: chunked", *ch as char));
+    // Add header name suffix variations (control character before colon)
+    // These test how parsers handle control characters in header names
+    for ch in [NUL, TAB, VT, FF, DEL].iter() {
+        te_headers.push(format!(
+            "Transfer-Encoding{}: chunked",
+            String::from_utf8_lossy(&[*ch])
+        ));
     }
 
     te_headers
@@ -359,6 +382,47 @@ pub fn get_te_te_payloads(
     payloads
 }
 
+/// Helper function to check if a payload contains a Transfer-Encoding related header
+/// This handles various obfuscation techniques including control characters in header names
+fn contains_te_header_pattern(payload: &str) -> bool {
+    let payload_lower = payload.to_lowercase();
+    
+    // Standard patterns (most reliable)
+    if payload_lower.contains("transfer-encoding") ||
+       payload_lower.contains("transfer_encoding") ||  // underjoin pattern
+       payload_lower.contains("transfer encoding") ||  // spacejoin pattern
+       payload_lower.contains("transfer\\encoding") || // backslash pattern
+       payload_lower.contains("content-encoding") {    // Content-Encoding confusion
+        return true;
+    }
+    
+    // URL-encoded patterns
+    if payload_lower.contains("transfer%") || payload_lower.contains("=?") {
+        return true;
+    }
+    
+    // Partial patterns for control character obfuscation
+    // These catch cases where control chars (CR, null, etc.) are inserted into header names
+    if payload_lower.contains("nsfer-encoding") || // Handles CR in "Tra\rnsfer-Encoding"
+       payload_lower.contains("encoding: chunked") ||
+       payload_lower.contains("encoding:chunked") ||
+       payload_lower.contains("encoding:\tchunked") {
+        return true;
+    }
+    
+    // Check for "chunked" value which should appear in all TE headers
+    if payload_lower.contains("chunked") {
+        // Also verify there's some encoding-related text nearby
+        if payload_lower.contains("encoding") || 
+           payload_lower.contains("encod") ||
+           payload_lower.contains("transf") {
+            return true;
+        }
+    }
+    
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -374,24 +438,12 @@ mod tests {
         // Check that all payloads contain required components
         for (i, payload) in payloads.iter().enumerate() {
             assert!(payload.contains("Content-Length: 6"), "Payload {} missing Content-Length", i);
-            // Check for Transfer-Encoding with various casings and formats
-            // Note: Some payloads use control characters (CR, null, etc.) in the header name
-            // which can break standard substring matching
-            let payload_lower = payload.to_lowercase();
-            let has_te_header = 
-                payload_lower.contains("transfer-encoding") || 
-                payload_lower.contains("transfer_encoding") ||
-                payload_lower.contains("transfer encoding") ||
-                payload_lower.contains("transfer\\encoding") ||
-                payload_lower.contains("transf") || // May not match if there's a control char in the name
-                payload_lower.contains("content-encoding") || // Content-Encoding confusion pattern
-                payload_lower.contains("transfer%") || // URL-encoded Transfer
-                payload_lower.contains("=?") || // MIME encoding
-                payload_lower.contains("nsfer-encoding") || // Partial match for CR-in-name patterns
-                payload_lower.contains("encoding: chunked") || // Match the value part
-                payload_lower.contains("encoding:chunked") || // No space after colon
-                payload_lower.contains("tra"); // Most basic match - "tra" prefix
-            assert!(has_te_header, "Payload {} should contain some form of Transfer-Encoding header. First 200 chars: {}", i, &payload[..std::cmp::min(200, payload.len())]);
+            // Use helper function to check for Transfer-Encoding header patterns
+            assert!(
+                contains_te_header_pattern(payload),
+                "Payload {} should contain some form of Transfer-Encoding header. First 200 chars: {}", 
+                i, &payload[..std::cmp::min(200, payload.len())]
+            );
             assert!(payload.contains("POST /test HTTP/1.1"));
             assert!(payload.contains("Host: example.com"));
         }
@@ -406,22 +458,11 @@ mod tests {
 
         for (i, payload) in payloads.iter().enumerate() {
             assert!(payload.contains("Content-Length: 4"));
-            // Check for Transfer-Encoding with various casings and formats
-            let payload_lower = payload.to_lowercase();
-            let has_te_header = 
-                payload_lower.contains("transfer-encoding") || 
-                payload_lower.contains("transfer_encoding") ||
-                payload_lower.contains("transfer encoding") ||
-                payload_lower.contains("transfer\\encoding") ||
-                payload_lower.contains("transf") || 
-                payload_lower.contains("content-encoding") || 
-                payload_lower.contains("transfer%") || 
-                payload_lower.contains("=?") || 
-                payload_lower.contains("nsfer-encoding") || // Partial match for CR-in-name patterns
-                payload_lower.contains("encoding: chunked") ||
-                payload_lower.contains("encoding:chunked") ||
-                payload_lower.contains("tra"); // Most basic match
-            assert!(has_te_header, "Payload {} should contain some form of Transfer-Encoding header", i);
+            // Use helper function to check for Transfer-Encoding header patterns
+            assert!(
+                contains_te_header_pattern(payload),
+                "Payload {} should contain some form of Transfer-Encoding header", i
+            );
             assert!(payload.contains("GET /api HTTP/1.1"));
         }
     }

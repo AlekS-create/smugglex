@@ -28,15 +28,13 @@ pub struct CheckParams<'a> {
 
 /// Runs a set of attack requests for a given check type.
 pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult> {
+    let total_requests = params.attack_requests.len();
+
     if !params.verbose {
-        params
-            .pb
-            .set_message(format!("Checking for {}...", params.check_name));
-    } else {
-        println!(
-            "\n{}",
-            format!("[!] Checking for {} vulnerability", params.check_name).bold()
-        );
+        params.pb.set_message(format!(
+            "checking {} (0/{})",
+            params.check_name, total_requests
+        ));
     }
 
     let (normal_response, normal_duration) = send_request(
@@ -62,6 +60,15 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
     let timing_threshold = normal_duration.as_millis() * TIMING_MULTIPLIER;
 
     for (i, attack_request) in params.attack_requests.iter().enumerate() {
+        // Update progress message with current/total and percentage
+        if !params.verbose {
+            let current = i + 1;
+            let percentage = (current as f64 / total_requests as f64 * 100.0) as u32;
+            params.pb.set_message(format!(
+                "checking {} ({}/{} - {}%)",
+                params.check_name, current, total_requests, percentage
+            ));
+        }
         match send_request(
             params.host,
             params.port,
@@ -101,14 +108,6 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
                     result_payload_index = Some(i);
                     result_attack_status = Some(attack_status_line.to_string());
 
-                    let result_text = format!("[!] {} Result:", params.check_name);
-                    let vulnerable_text = "[!!!] VULNERABLE".red().bold();
-                    let reason = if is_timeout_error {
-                        "Timeout status code detected (408/504)"
-                    } else {
-                        "Excessive delay detected (possible desync)"
-                    };
-                    
                     // Export payload if export_dir is specified
                     if let Some(export_dir) = params.export_dir {
                         match export_payload(
@@ -119,63 +118,19 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
                             attack_request,
                             params.use_tls,
                         ) {
-                            Ok(filename) => {
-                                if params.verbose {
-                                    println!("  {} Payload exported to: {}", "[+] ".green(), filename.cyan());
-                                } else {
-                                    params.pb.println(format!("  {} Payload exported to: {}", "[+] ".green(), filename.cyan()));
-                                }
+                            Ok(_) => {
+                                // Silently exported, will be shown in final results
                             }
                             Err(e) => {
                                 if params.verbose {
-                                    println!("  {} Failed to export payload: {}", "[!] ".yellow(), e);
-                                } else {
-                                    params.pb.println(format!("  {} Failed to export payload: {}", "[!] ".yellow(), e));
+                                    println!(
+                                        "  {} Failed to export payload: {}",
+                                        "[!] ".yellow(),
+                                        e
+                                    );
                                 }
                             }
                         }
-                    }
-
-                    if params.verbose {
-                        println!("\n{}", result_text.bold());
-                        println!("  {}", vulnerable_text);
-                        println!("  {} Reason: {}", "[+] ".green(), reason.yellow());
-                        println!("  {} Payload index: {}", "[+] ".green(), i);
-                        println!(
-                            "  {} Normal response: {} (took {:.2?})",
-                            "[+] ".green(),
-                            normal_status,
-                            normal_duration
-                        );
-                        println!(
-                            "  {} Attack response: {} (took {:.2?})",
-                            "[+] ".green(),
-                            attack_status_line,
-                            attack_duration
-                        );
-                    } else {
-                        params.pb.println(format!("\n{}", result_text.bold()));
-                        params.pb.println(format!("  {}", vulnerable_text));
-                        params.pb.println(format!(
-                            "  {} Reason: {}",
-                            "[+] ".green(),
-                            reason.yellow()
-                        ));
-                        params
-                            .pb
-                            .println(format!("  {} Payload index: {}", "[+] ".green(), i));
-                        params.pb.println(format!(
-                            "  {} Normal response: {} (took {:.2?})",
-                            "[+] ".green(),
-                            normal_status,
-                            normal_duration
-                        ));
-                        params.pb.println(format!(
-                            "  {} Attack response: {} (took {:.2?})",
-                            "[+] ".green(),
-                            attack_status_line,
-                            attack_duration
-                        ));
                     }
                     break;
                 }
@@ -194,9 +149,6 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
                     result_attack_status = Some("Connection Timeout".to_string());
                     last_attack_duration = Some(Duration::from_secs(params.timeout));
 
-                    let result_text = format!("[!] {} Result:", params.check_name);
-                    let vulnerable_text = "[!!!] VULNERABLE".red().bold();
-                    
                     // Export payload if export_dir is specified
                     if let Some(export_dir) = params.export_dir {
                         match export_payload(
@@ -207,94 +159,31 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
                             attack_request,
                             params.use_tls,
                         ) {
-                            Ok(filename) => {
-                                if params.verbose {
-                                    println!("  {} Payload exported to: {}", "[+] ".green(), filename.cyan());
-                                } else {
-                                    params.pb.println(format!("  {} Payload exported to: {}", "[+] ".green(), filename.cyan()));
-                                }
+                            Ok(_) => {
+                                // Silently exported, will be shown in final results
                             }
                             Err(e) => {
                                 if params.verbose {
-                                    println!("  {} Failed to export payload: {}", "[!] ".yellow(), e);
-                                } else {
-                                    params.pb.println(format!("  {} Failed to export payload: {}", "[!] ".yellow(), e));
+                                    println!(
+                                        "  {} Failed to export payload: {}",
+                                        "[!] ".yellow(),
+                                        e
+                                    );
                                 }
                             }
                         }
                     }
-                    
-                    if params.verbose {
-                        println!("\n{}", result_text.bold());
-                        println!("  {}", vulnerable_text);
-                        println!(
-                            "  {} Reason: {}",
-                            "[+] ".green(),
-                            "Connection timeout (desync hang detected)".yellow()
-                        );
-                        println!("  {} Payload index: {}", "[+] ".green(), i);
-                        println!(
-                            "  {} Normal response: {} (took {:.2?})",
-                            "[+] ".green(),
-                            normal_status,
-                            normal_duration
-                        );
-                        println!(
-                            "  {} Attack request timed out after {:.2?}",
-                            "[+] ".green(),
-                            Duration::from_secs(params.timeout)
-                        );
-                    } else {
-                        params.pb.println(format!("\n{}", result_text.bold()));
-                        params.pb.println(format!("  {}", vulnerable_text));
-                        params.pb.println(format!(
-                            "  {} Reason: {}",
-                            "[+] ".green(),
-                            "Connection timeout (desync hang detected)".yellow()
-                        ));
-                        params
-                            .pb
-                            .println(format!("  {} Payload index: {}", "[+] ".green(), i));
-                        params.pb.println(format!(
-                            "  {} Normal response: {} (took {:.2?})",
-                            "[+] ".green(),
-                            normal_status,
-                            normal_duration
-                        ));
-                        params.pb.println(format!(
-                            "  {} Attack request timed out after {:.2?}",
-                            "[+] ".green(),
-                            Duration::from_secs(params.timeout)
-                        ));
-                    }
                     break;
-                } else {
-                    let error_text = format!(
+                } else if params.verbose {
+                    println!(
                         "\n{} Error during {} attack request (payload {}): {}",
                         "[!] ".yellow(),
                         params.check_name,
                         i,
                         e
                     );
-                    if params.verbose {
-                        println!("{}", error_text);
-                    } else {
-                        params.pb.println(error_text);
-                    }
                 }
             }
-        }
-    }
-
-    if !vulnerable {
-        let result_text = format!("[!] {} Result:", params.check_name);
-        let not_vulnerable_text = "[+] Not Vulnerable".green();
-        if params.verbose {
-            println!("\n{}", result_text.bold());
-            println!("  {}", not_vulnerable_text);
-        } else {
-            params.pb.println(format!("\n{}", result_text.bold()));
-            params.pb.println(format!("  {}", not_vulnerable_text));
         }
     }
 

@@ -24,20 +24,47 @@ pub struct ScanResults {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for data models and serialization
+    //! 
+    //! This module contains tests for:
+    //! - CheckResult creation and validation
+    //! - ScanResults aggregation
+    //! - JSON serialization and deserialization
+    //! - Edge cases (large durations, special characters)
+    //! - Different check types and status codes
+    //! - Clone implementation
+
     use super::*;
+
+    /// Helper function to create a test CheckResult
+    fn create_test_check_result(
+        check_type: &str,
+        vulnerable: bool,
+        payload_index: Option<usize>,
+        attack_status: Option<&str>,
+        attack_duration_ms: Option<u64>,
+    ) -> CheckResult {
+        CheckResult {
+            check_type: check_type.to_string(),
+            vulnerable,
+            payload_index,
+            normal_status: "HTTP/1.1 200 OK".to_string(),
+            attack_status: attack_status.map(|s| s.to_string()),
+            normal_duration_ms: 150,
+            attack_duration_ms,
+            timestamp: "2024-01-01T12:00:00Z".to_string(),
+        }
+    }
 
     #[test]
     fn test_check_result_creation_vulnerable() {
-        let result = CheckResult {
-            check_type: "CL.TE".to_string(),
-            vulnerable: true,
-            payload_index: Some(3),
-            normal_status: "HTTP/1.1 200 OK".to_string(),
-            attack_status: Some("HTTP/1.1 504 Gateway Timeout".to_string()),
-            normal_duration_ms: 200,
-            attack_duration_ms: Some(5000),
-            timestamp: "2024-01-01T12:00:00Z".to_string(),
-        };
+        let result = create_test_check_result(
+            "CL.TE",
+            true,
+            Some(3),
+            Some("HTTP/1.1 504 Gateway Timeout"),
+            Some(5000),
+        );
 
         assert_eq!(result.check_type, "CL.TE");
         assert!(result.vulnerable);
@@ -47,28 +74,115 @@ mod tests {
             result.attack_status,
             Some("HTTP/1.1 504 Gateway Timeout".to_string())
         );
-        assert_eq!(result.normal_duration_ms, 200);
+        assert_eq!(result.normal_duration_ms, 150);
         assert_eq!(result.attack_duration_ms, Some(5000));
     }
 
     #[test]
     fn test_check_result_creation_not_vulnerable() {
-        let result = CheckResult {
-            check_type: "TE.CL".to_string(),
-            vulnerable: false,
-            payload_index: None,
-            normal_status: "HTTP/1.1 200 OK".to_string(),
-            attack_status: None,
-            normal_duration_ms: 150,
-            attack_duration_ms: None,
-            timestamp: "2024-01-01T12:00:00Z".to_string(),
-        };
+        let result = create_test_check_result("TE.CL", false, None, None, None);
 
         assert_eq!(result.check_type, "TE.CL");
         assert!(!result.vulnerable);
         assert_eq!(result.payload_index, None);
         assert_eq!(result.attack_status, None);
         assert_eq!(result.attack_duration_ms, None);
+    }
+
+    // Table-driven test for different check types
+    #[test]
+    fn test_check_result_all_check_types() {
+        let check_types = vec!["CL.TE", "TE.CL", "TE.TE"];
+
+        for check_type in check_types {
+            let result = create_test_check_result(check_type, false, None, None, None);
+            assert_eq!(
+                result.check_type, check_type,
+                "Check type should match for {}",
+                check_type
+            );
+            assert!(!result.vulnerable, "{} should not be vulnerable", check_type);
+        }
+    }
+
+    // Table-driven test for different HTTP status codes
+    #[test]
+    fn test_check_result_various_status_codes() {
+        let status_codes = vec![
+            ("HTTP/1.1 200 OK", false),
+            ("HTTP/1.1 408 Request Timeout", true),
+            ("HTTP/1.1 500 Internal Server Error", false),
+            ("HTTP/1.1 502 Bad Gateway", false),
+            ("HTTP/1.1 503 Service Unavailable", false),
+            ("HTTP/1.1 504 Gateway Timeout", true),
+        ];
+
+        for (status, should_be_timeout) in status_codes {
+            let result = if should_be_timeout {
+                create_test_check_result("CL.TE", true, Some(0), Some(status), Some(5000))
+            } else {
+                create_test_check_result("CL.TE", false, None, Some(status), None)
+            };
+
+            assert!(
+                result.attack_status.is_some(),
+                "Attack status should be set for {}",
+                status
+            );
+            assert_eq!(
+                result.attack_status.as_deref(),
+                Some(status),
+                "Status code should match"
+            );
+        }
+    }
+
+    // Edge case: Test with very long durations
+    #[test]
+    fn test_check_result_large_duration() {
+        let result = create_test_check_result("TE.TE", true, Some(0), Some("Connection Timeout"), Some(u64::MAX));
+        
+        assert_eq!(result.attack_duration_ms, Some(u64::MAX));
+        assert!(result.vulnerable);
+    }
+
+    // Edge case: Test with zero duration
+    #[test]
+    fn test_check_result_zero_duration() {
+        let result = CheckResult {
+            check_type: "CL.TE".to_string(),
+            vulnerable: false,
+            payload_index: None,
+            normal_status: "HTTP/1.1 200 OK".to_string(),
+            attack_status: None,
+            normal_duration_ms: 0,
+            attack_duration_ms: Some(0),
+            timestamp: "2024-01-01T12:00:00Z".to_string(),
+        };
+
+        assert_eq!(result.normal_duration_ms, 0);
+        assert_eq!(result.attack_duration_ms, Some(0));
+    }
+
+    // Test with special characters in strings
+    #[test]
+    fn test_check_result_special_characters() {
+        let result = CheckResult {
+            check_type: "CL.TE".to_string(),
+            vulnerable: true,
+            payload_index: Some(0),
+            normal_status: "HTTP/1.1 200 OK".to_string(),
+            attack_status: Some("HTTP/1.1 504 \"Gateway\" Timeout".to_string()),
+            normal_duration_ms: 100,
+            attack_duration_ms: Some(5000),
+            timestamp: "2024-01-01T12:00:00+00:00".to_string(),
+        };
+
+        let json = serde_json::to_string(&result).expect("Should serialize");
+        let deserialized: CheckResult = serde_json::from_str(&json).expect("Should deserialize");
+        
+        assert_eq!(result.attack_status, deserialized.attack_status);
+        assert_eq!(result.timestamp, deserialized.timestamp);
     }
 
     #[test]

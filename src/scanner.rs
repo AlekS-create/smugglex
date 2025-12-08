@@ -28,10 +28,13 @@ pub struct CheckParams<'a> {
 
 /// Runs a set of attack requests for a given check type.
 pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult> {
+    let total_requests = params.attack_requests.len();
+
     if !params.verbose {
-        params
-            .pb
-            .set_message(format!("checking {}", params.check_name));
+        params.pb.set_message(format!(
+            "checking {} (0/{})",
+            params.check_name, total_requests
+        ));
     }
 
     let (normal_response, normal_duration) = send_request(
@@ -57,6 +60,15 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
     let timing_threshold = normal_duration.as_millis() * TIMING_MULTIPLIER;
 
     for (i, attack_request) in params.attack_requests.iter().enumerate() {
+        // Update progress message with current/total and percentage
+        if !params.verbose {
+            let current = i + 1;
+            let percentage = (current as f64 / total_requests as f64 * 100.0) as u32;
+            params.pb.set_message(format!(
+                "checking {} ({}/{} - {}%)",
+                params.check_name, current, total_requests, percentage
+            ));
+        }
         match send_request(
             params.host,
             params.port,

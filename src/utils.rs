@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::http::send_request;
 use chrono::Local;
-use colored::*;
+use colored::{ColoredString, Colorize};
 use std::fs;
 
 /// Fetch cookies from the target server
@@ -42,6 +42,11 @@ pub async fn fetch_cookies(
     Ok(cookies)
 }
 
+/// Sanitize hostname for use in filenames
+pub fn sanitize_hostname(host: &str) -> String {
+    host.replace([':', '/', '.'], "_")
+}
+
 /// Export payload to a file
 pub fn export_payload(
     export_dir: &str,
@@ -55,7 +60,7 @@ pub fn export_payload(
     fs::create_dir_all(export_dir)?;
 
     // Sanitize hostname for filename
-    let sanitized_host = host.replace([':', '/', '.'], "_");
+    let sanitized_host = sanitize_hostname(host);
     let protocol = if use_tls { "https" } else { "http" };
 
     let filename = format!(

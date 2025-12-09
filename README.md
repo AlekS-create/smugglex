@@ -105,6 +105,13 @@ With payload export:
 smugglex https://target.com --export-payloads ./payloads
 ```
 
+With exit-first flag (stop scanning after first vulnerability):
+```bash
+smugglex https://target.com -1
+# or
+smugglex https://target.com --exit-first
+```
+
 Advanced usage combining multiple features:
 ```bash
 smugglex https://api.example.com \
@@ -129,6 +136,7 @@ smugglex https://api.example.com \
 - `--vhost <VHOST>`: Virtual host to use in Host header (overrides URL hostname)
 - `--cookies`: Fetch and append cookies from initial request
 - `--export-payloads <DIR>`: Export payloads to directory when vulnerabilities are found
+- `-1, --exit-first`: Exit quickly after finding the first vulnerability
 
 ## Attack Types
 

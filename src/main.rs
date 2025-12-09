@@ -155,9 +155,7 @@ async fn process_url(target_url: &str, cli: &Cli) -> Result<()> {
             export_dir: cli.export_dir.as_deref(),
         })
         .await?;
-        if result.vulnerable {
-            found_vulnerability = true;
-        }
+        found_vulnerability |= result.vulnerable;
         results.push(result);
         pb.inc(1);
     }
@@ -178,9 +176,7 @@ async fn process_url(target_url: &str, cli: &Cli) -> Result<()> {
             export_dir: cli.export_dir.as_deref(),
         })
         .await?;
-        if result.vulnerable {
-            found_vulnerability = true;
-        }
+        found_vulnerability |= result.vulnerable;
         results.push(result);
         pb.inc(1);
     }
@@ -201,9 +197,7 @@ async fn process_url(target_url: &str, cli: &Cli) -> Result<()> {
             export_dir: cli.export_dir.as_deref(),
         })
         .await?;
-        if result.vulnerable {
-            found_vulnerability = true;
-        }
+        found_vulnerability |= result.vulnerable;
         results.push(result);
         pb.inc(1);
     }

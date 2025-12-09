@@ -153,7 +153,6 @@ async fn process_url(target_url: &str, cli: &Cli) -> Result<()> {
             verbose,
             use_tls,
             export_dir: cli.export_dir.as_deref(),
-            exit_first: cli.exit_first,
         })
         .await?;
         if result.vulnerable {
@@ -177,7 +176,6 @@ async fn process_url(target_url: &str, cli: &Cli) -> Result<()> {
             verbose,
             use_tls,
             export_dir: cli.export_dir.as_deref(),
-            exit_first: cli.exit_first,
         })
         .await?;
         if result.vulnerable {
@@ -201,7 +199,6 @@ async fn process_url(target_url: &str, cli: &Cli) -> Result<()> {
             verbose,
             use_tls,
             export_dir: cli.export_dir.as_deref(),
-            exit_first: cli.exit_first,
         })
         .await?;
         if result.vulnerable {

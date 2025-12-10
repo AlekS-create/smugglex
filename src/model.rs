@@ -27,7 +27,7 @@ pub struct ScanResults {
 #[cfg(test)]
 mod tests {
     //! Tests for data models and serialization
-    //! 
+    //!
     //! This module contains tests for:
     //! - CheckResult creation and validation
     //! - ScanResults aggregation
@@ -104,7 +104,11 @@ mod tests {
                 "Check type should match for {}",
                 check_type
             );
-            assert!(!result.vulnerable, "{} should not be vulnerable", check_type);
+            assert!(
+                !result.vulnerable,
+                "{} should not be vulnerable",
+                check_type
+            );
         }
     }
 
@@ -143,8 +147,14 @@ mod tests {
     // Edge case: Test with very long durations
     #[test]
     fn test_check_result_large_duration() {
-        let result = create_test_check_result("TE.TE", true, Some(0), Some("Connection Timeout"), Some(u64::MAX));
-        
+        let result = create_test_check_result(
+            "TE.TE",
+            true,
+            Some(0),
+            Some("Connection Timeout"),
+            Some(u64::MAX),
+        );
+
         assert_eq!(result.attack_duration_ms, Some(u64::MAX));
         assert!(result.vulnerable);
     }
@@ -185,7 +195,7 @@ mod tests {
 
         let json = serde_json::to_string(&result).expect("Should serialize");
         let deserialized: CheckResult = serde_json::from_str(&json).expect("Should deserialize");
-        
+
         assert_eq!(result.attack_status, deserialized.attack_status);
         assert_eq!(result.timestamp, deserialized.timestamp);
     }
@@ -482,7 +492,8 @@ mod tests {
     #[test]
     fn test_payload_stored_in_vulnerable_result() {
         // Test that payload is properly stored when vulnerability is detected
-        let payload_content = "POST / HTTP/1.1\r\nHost: test.com\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n";
+        let payload_content =
+            "POST / HTTP/1.1\r\nHost: test.com\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n";
         let result = CheckResult {
             check_type: "CL.TE".to_string(),
             vulnerable: true,
@@ -494,7 +505,7 @@ mod tests {
             timestamp: "2024-01-01T12:00:00Z".to_string(),
             payload: Some(payload_content.to_string()),
         };
-        
+
         assert!(result.vulnerable);
         assert!(result.payload.is_some());
         assert_eq!(result.payload.as_ref().unwrap(), payload_content);
@@ -514,7 +525,7 @@ mod tests {
             timestamp: "2024-01-01T12:00:00Z".to_string(),
             payload: None,
         };
-        
+
         assert!(!result.vulnerable);
         assert!(result.payload.is_none());
     }
@@ -535,7 +546,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&result).expect("Failed to serialize");
-        
+
         // Verify JSON contains payload field
         assert!(json.contains("\"payload\":"));
         assert!(json.contains("GET / HTTP/1.1"));
@@ -557,7 +568,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&result).expect("Failed to serialize");
-        
+
         // Verify JSON does NOT contain payload field when it's None
         assert!(!json.contains("\"payload\":"));
     }

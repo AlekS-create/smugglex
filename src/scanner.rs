@@ -24,6 +24,8 @@ pub struct CheckParams<'a> {
     pub verbose: bool,
     pub use_tls: bool,
     pub export_dir: Option<&'a str>,
+    pub current_check: usize,
+    pub total_checks: usize,
 }
 
 /// Runs a set of attack requests for a given check type.
@@ -32,8 +34,8 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
 
     if !params.verbose {
         params.pb.set_message(format!(
-            "checking {} (0/{})",
-            params.check_name, total_requests
+            "[{}/{}] checking {} (0/{})",
+            params.current_check, params.total_checks, params.check_name, total_requests
         ));
     }
 
@@ -66,8 +68,8 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
             let current = i + 1;
             let percentage = (current as f64 / total_requests as f64 * 100.0) as u32;
             params.pb.set_message(format!(
-                "checking {} ({}/{} - {}%)",
-                params.check_name, current, total_requests, percentage
+                "[{}/{}] checking {} ({}/{} - {}%)",
+                params.current_check, params.total_checks, params.check_name, current, total_requests, percentage
             ));
         }
         match send_request(

@@ -99,7 +99,7 @@ pub fn log(level: LogLevel, message: &str) {
 #[cfg(test)]
 mod tests {
     //! Tests for utility functions
-    //! 
+    //!
     //! This module contains tests for:
     //! - Payload export functionality
     //! - Hostname sanitization for file names
@@ -166,7 +166,10 @@ mod tests {
             filename.contains("http_"),
             "Filename should indicate HTTP protocol"
         );
-        assert!(filename.contains("TECL"), "Filename should include check type");
+        assert!(
+            filename.contains("TECL"),
+            "Filename should include check type"
+        );
         assert!(
             filename.contains("_1.txt"),
             "Filename should include payload index"
@@ -178,7 +181,10 @@ mod tests {
     #[test]
     fn test_sanitize_hostname_dots() {
         let result = sanitize_hostname("example.com");
-        assert_eq!(result, "example_com", "Dots should be replaced with underscores");
+        assert_eq!(
+            result, "example_com",
+            "Dots should be replaced with underscores"
+        );
     }
 
     #[test]
@@ -211,7 +217,10 @@ mod tests {
     #[test]
     fn test_sanitize_hostname_no_special_chars() {
         let result = sanitize_hostname("localhost");
-        assert_eq!(result, "localhost", "Should remain unchanged if no special chars");
+        assert_eq!(
+            result, "localhost",
+            "Should remain unchanged if no special chars"
+        );
     }
 
     #[test]
@@ -262,7 +271,7 @@ mod tests {
     fn test_export_payload_creates_directory_if_not_exists() {
         let temp_dir = env::temp_dir().join("smugglex_test_new_dir");
         let temp_dir_str = temp_dir.to_str().unwrap();
-        
+
         // Ensure directory doesn't exist
         let _ = fs::remove_dir_all(temp_dir_str);
 

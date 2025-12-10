@@ -69,7 +69,12 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
             let percentage = (current as f64 / total_requests as f64 * 100.0) as u32;
             params.pb.set_message(format!(
                 "[{}/{}] checking {} ({}/{} - {}%)",
-                params.current_check, params.total_checks, params.check_name, current, total_requests, percentage
+                params.current_check,
+                params.total_checks,
+                params.check_name,
+                current,
+                total_requests,
+                percentage
             ));
         }
         match send_request(
@@ -208,7 +213,7 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
 #[cfg(test)]
 mod tests {
     //! Tests for smuggling detection scanner logic
-    //! 
+    //!
     //! This module contains tests for:
     //! - Timing-based detection thresholds and constants
     //! - Timing multiplier and minimum delay validation
@@ -221,7 +226,7 @@ mod tests {
     use super::*;
 
     // ========== Constants Tests ==========
-    
+
     #[test]
     fn test_timing_multiplier_constant() {
         assert_eq!(TIMING_MULTIPLIER, 3, "Timing multiplier should be 3x");
@@ -229,7 +234,10 @@ mod tests {
 
     #[test]
     fn test_min_delay_constant() {
-        assert_eq!(MIN_DELAY_MS, 1000, "Minimum delay should be 1000ms (1 second)");
+        assert_eq!(
+            MIN_DELAY_MS, 1000,
+            "Minimum delay should be 1000ms (1 second)"
+        );
     }
 
     // ========== Progress Message Format Tests ==========
@@ -240,12 +248,12 @@ mod tests {
         let total_checks = 4;
         let check_name = "CL.TE";
         let total_requests = 10;
-        
+
         let message = format!(
             "[{}/{}] checking {} (0/{})",
             current_check, total_checks, check_name, total_requests
         );
-        
+
         assert_eq!(message, "[1/4] checking CL.TE (0/10)");
     }
 
@@ -257,31 +265,26 @@ mod tests {
         let current = 5;
         let total_requests = 10;
         let percentage = (current as f64 / total_requests as f64 * 100.0) as u32;
-        
+
         let message = format!(
             "[{}/{}] checking {} ({}/{} - {}%)",
             current_check, total_checks, check_name, current, total_requests, percentage
         );
-        
+
         assert_eq!(message, "[2/4] checking TE.CL (5/10 - 50%)");
     }
 
     #[test]
     fn test_progress_message_all_check_types() {
-        let check_types = vec![
-            ("CL.TE", 1),
-            ("TE.CL", 2),
-            ("TE.TE", 3),
-            ("H2C", 4),
-        ];
+        let check_types = vec![("CL.TE", 1), ("TE.CL", 2), ("TE.TE", 3), ("H2C", 4)];
         let total_checks = 4;
-        
+
         for (check_name, current_check) in check_types {
             let message = format!(
                 "[{}/{}] checking {} (0/10)",
                 current_check, total_checks, check_name
             );
-            
+
             assert!(message.starts_with(&format!("[{}/{}]", current_check, total_checks)));
             assert!(message.contains(check_name));
         }
@@ -404,7 +407,7 @@ mod tests {
             TestCase {
                 name: "Edge case - exactly at min delay",
                 normal_ms: 200,
-                attack_ms: 1000, // = MIN_DELAY_MS
+                attack_ms: 1000,      // = MIN_DELAY_MS
                 should_detect: false, // Not greater than MIN_DELAY_MS
             },
         ];

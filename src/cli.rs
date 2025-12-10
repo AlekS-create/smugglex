@@ -27,7 +27,7 @@ pub struct Cli {
     #[arg(short = 'H', long = "header")]
     pub headers: Vec<String>,
 
-    /// Specify which checks to run (comma-separated: cl-te,te-cl,te-te,h2c)
+    /// Specify which checks to run (comma-separated: cl-te,te-cl,te-te,h2c,h2)
     #[arg(short = 'c', long = "checks")]
     pub checks: Option<String>,
 
@@ -51,7 +51,7 @@ pub struct Cli {
 #[cfg(test)]
 mod tests {
     //! Tests for CLI argument parsing
-    //! 
+    //!
     //! This module contains tests for:
     //! - URL parsing (single, multiple, with paths/ports)
     //! - Command-line option parsing
@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn test_various_http_methods() {
         let methods = vec!["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"];
-        
+
         for method in methods {
             let cli = Cli::parse_from(&["smugglex", "http://example.com", "-m", method]);
             assert_eq!(cli.method, method, "Method should be {}", method);
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn test_various_timeout_values() {
         let timeouts = vec![1, 5, 10, 30, 60, 120];
-        
+
         for timeout in timeouts {
             let timeout_str = timeout.to_string();
             let cli = Cli::parse_from(&["smugglex", "http://example.com", "-t", &timeout_str]);
@@ -177,12 +177,7 @@ mod tests {
     // Test output file option
     #[test]
     fn test_output_file_option() {
-        let cli = Cli::parse_from(&[
-            "smugglex",
-            "http://example.com",
-            "-o",
-            "results.json",
-        ]);
+        let cli = Cli::parse_from(&["smugglex", "http://example.com", "-o", "results.json"]);
         assert_eq!(cli.output, Some("results.json".to_string()));
     }
 
@@ -264,7 +259,10 @@ mod tests {
     #[test]
     fn test_exit_first_long_flag() {
         let cli = Cli::parse_from(&["smugglex", "http://example.com", "--exit-first"]);
-        assert!(cli.exit_first, "exit_first should be true with --exit-first flag");
+        assert!(
+            cli.exit_first,
+            "exit_first should be true with --exit-first flag"
+        );
     }
 
     #[test]

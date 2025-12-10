@@ -24,6 +24,7 @@ Timing: Normal: 1263ms, Attack: 10000ms
 
 ## Recent Improvements
 
+- **H2 Smuggling Support**: Added detection for HTTP/2 protocol-level desync attacks with 25+ payload variations inspired by [PortSwigger's HTTP/2 research](https://portswigger.net/research/http2), including pseudo-header manipulation, header name obfuscation, forbidden header injection, and protocol translation attacks
 - **H2C Smuggling Support**: Added detection for HTTP/2 Cleartext (h2c) upgrade smuggling attacks with 20+ payload variations
 - **Extended Mutation Patterns**: Expanded from 6 to 30+ Transfer-Encoding header variations inspired by [smuggler](https://github.com/defparam/smuggler), including whitespace injection, control characters, case variations, and obfuscation techniques
 - **Cookie Support**: Automatically fetch and append cookies from the target server for authenticated testing
@@ -36,9 +37,10 @@ Timing: Normal: 1263ms, Attack: 10000ms
 
 ## Features
 
-- **Multiple Attack Types**: Tests for CL.TE, TE.CL, TE.TE, and H2C smuggling vulnerabilities
+- **Multiple Attack Types**: Tests for CL.TE, TE.CL, TE.TE, H2C, and H2 smuggling vulnerabilities
 - **Extended Mutation Testing**: 30+ variations of Transfer-Encoding header obfuscations
 - **H2C Smuggling Detection**: 20+ variations of HTTP/2 Cleartext (h2c) upgrade smuggling attacks
+- **H2 Smuggling Detection**: 25+ variations of HTTP/2 protocol-level desync attacks
 - **HTTPS Support**: Automatically detects and uses TLS for HTTPS URLs
 - **Custom Headers**: Add custom headers to requests for advanced testing
 - **Cookie Fetching**: Automatically fetch and use cookies for authenticated testing
@@ -91,7 +93,10 @@ smugglex https://target.com -c cl-te
 # Run CL.TE and H2C checks
 smugglex https://target.com -c cl-te,h2c
 
-# Run all checks (default)
+# Run HTTP/2 protocol smuggling check
+smugglex https://target.com -c h2
+
+# Run all checks (default: cl-te,te-cl,te-te,h2c,h2)
 smugglex https://target.com
 ```
 
@@ -137,7 +142,7 @@ smugglex https://api.example.com \
 - `-v, --verbose`: Enable verbose mode to see detailed requests and responses
 - `-o, --output <OUTPUT>`: Save results to a JSON file
 - `-H, --header <HEADERS>`: Add custom headers (can be specified multiple times)
-- `-c, --checks <CHECKS>`: Specify which checks to run (comma-separated: cl-te,te-cl,te-te,h2c). Default: all checks
+- `-c, --checks <CHECKS>`: Specify which checks to run (comma-separated: cl-te,te-cl,te-te,h2c,h2). Default: all checks
 - `--vhost <VHOST>`: Virtual host to use in Host header (overrides URL hostname)
 - `--cookies`: Fetch and append cookies from initial request
 - `--export-payloads <DIR>`: Export payloads to directory when vulnerabilities are found
@@ -195,6 +200,25 @@ Tests scenarios where HTTP/1.1 to HTTP/2 upgrade mechanisms can be exploited for
 - Multiple Upgrade headers (upgrade obfuscation)
 - Different HTTP2-Settings positions in the request
 - And 20+ more variations to test different proxy configurations
+
+### H2 (HTTP/2 Protocol Smuggling)
+Tests scenarios where HTTP/2 protocol-level features are exploited for request smuggling between front-end and back-end servers.
+
+**How it works:** H2 smuggling exploits discrepancies in how front-end and back-end servers handle HTTP/2-specific features during protocol translation. When a front-end uses HTTP/2 but translates requests to HTTP/1.1 for the back-end (or vice versa), differences in header processing, pseudo-headers, and protocol constraints can lead to request desynchronization.
+
+**Reference:** [PortSwigger - HTTP/2 Desync Attacks](https://portswigger.net/research/http2)
+
+**Example attack vectors:**
+- Duplicate pseudo-headers (:method, :path, :authority, :scheme)
+- Header names with colons (valid in HTTP/2, invalid in HTTP/1.1)
+- HTTP/2 forbidden headers (Transfer-Encoding, Connection, Keep-Alive, Proxy-Connection)
+- Content-Length conflicts (HTTP/2 uses frame length, not Content-Length)
+- Header value newline injection (forbidden in HTTP/2, might be translated to HTTP/1.1)
+- Case sensitivity attacks (HTTP/2 requires lowercase, HTTP/1.1 is case-insensitive)
+- Header ordering violations (HTTP/2 requires pseudo-headers first)
+- HTTP/2 to HTTP/1.1 downgrade attacks
+- Request splitting via header injection
+- And 25+ more variations to test different translation scenarios
 
 ## Security Considerations
 

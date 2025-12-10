@@ -216,7 +216,7 @@ mod tests {
     //! - HTTP status code parsing (408, 504 timeout codes)
     //! - Edge cases for timing thresholds
     //! - CheckResult state validation
-    //! - Progress message formatting with overall check position
+    //! - Progress message formatting showing current check number vs total checks (e.g., [1/4])
 
     use super::*;
 

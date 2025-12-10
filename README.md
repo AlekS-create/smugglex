@@ -24,6 +24,7 @@ Timing: Normal: 1263ms, Attack: 10000ms
 
 ## Recent Improvements
 
+- **H2C Smuggling Support**: Added detection for HTTP/2 Cleartext (h2c) upgrade smuggling attacks with 20+ payload variations
 - **Extended Mutation Patterns**: Expanded from 6 to 30+ Transfer-Encoding header variations inspired by [smuggler](https://github.com/defparam/smuggler), including whitespace injection, control characters, case variations, and obfuscation techniques
 - **Cookie Support**: Automatically fetch and append cookies from the target server for authenticated testing
 - **Virtual Host Support**: Override the Host header to test different virtual hosts while connecting to the same IP
@@ -35,8 +36,9 @@ Timing: Normal: 1263ms, Attack: 10000ms
 
 ## Features
 
-- **Multiple Attack Types**: Tests for CL.TE, TE.CL, and TE.TE smuggling vulnerabilities
+- **Multiple Attack Types**: Tests for CL.TE, TE.CL, TE.TE, and H2C smuggling vulnerabilities
 - **Extended Mutation Testing**: 30+ variations of Transfer-Encoding header obfuscations
+- **H2C Smuggling Detection**: 20+ variations of HTTP/2 Cleartext (h2c) upgrade smuggling attacks
 - **HTTPS Support**: Automatically detects and uses TLS for HTTPS URLs
 - **Custom Headers**: Add custom headers to requests for advanced testing
 - **Cookie Fetching**: Automatically fetch and use cookies for authenticated testing
@@ -86,8 +88,11 @@ Run only specific checks:
 # Run only CL.TE check
 smugglex https://target.com -c cl-te
 
-# Run CL.TE and TE.CL checks
-smugglex https://target.com -c cl-te,te-cl
+# Run CL.TE and H2C checks
+smugglex https://target.com -c cl-te,h2c
+
+# Run all checks (default)
+smugglex https://target.com
 ```
 
 With cookies (automatically fetch and use cookies):
@@ -132,7 +137,7 @@ smugglex https://api.example.com \
 - `-v, --verbose`: Enable verbose mode to see detailed requests and responses
 - `-o, --output <OUTPUT>`: Save results to a JSON file
 - `-H, --header <HEADERS>`: Add custom headers (can be specified multiple times)
-- `-c, --checks <CHECKS>`: Specify which checks to run (comma-separated: cl-te,te-cl,te-te). Default: all checks
+- `-c, --checks <CHECKS>`: Specify which checks to run (comma-separated: cl-te,te-cl,te-te,h2c). Default: all checks
 - `--vhost <VHOST>`: Virtual host to use in Host header (overrides URL hostname)
 - `--cookies`: Fetch and append cookies from initial request
 - `--export-payloads <DIR>`: Export payloads to directory when vulnerabilities are found
@@ -173,6 +178,23 @@ Tests scenarios where both servers support Transfer-Encoding but one can be tric
 - Using `identity` encoding
 - Combining multiple encodings
 - Using non-standard encoding names
+
+### H2C (HTTP/2 Cleartext Smuggling)
+Tests scenarios where HTTP/1.1 to HTTP/2 upgrade mechanisms can be exploited for request smuggling.
+
+**How it works:** H2C smuggling exploits discrepancies in how front-end and back-end servers handle HTTP/1.1 requests with `Upgrade: h2c` headers. When a front-end proxy doesn't properly process the upgrade request but forwards it to a back-end that does (or vice versa), it can lead to request desynchronization similar to CL.TE attacks.
+
+**Reference:** [Bishop Fox - H2C Smuggling](https://bishopfox.com/blog/h2c-smuggling-request)
+
+**Example payload variations:**
+- Basic upgrade: `Upgrade: h2c` with `Connection: Upgrade, HTTP2-Settings`
+- HTTP2-Settings header variations (different base64 encoded SETTINGS frames)
+- Connection header obfuscations (case variations, different orderings)
+- Combining H2C with Transfer-Encoding headers
+- Combining H2C with Content-Length discrepancies
+- Multiple Upgrade headers (upgrade obfuscation)
+- Different HTTP2-Settings positions in the request
+- And 20+ more variations to test different proxy configurations
 
 ## Security Considerations
 

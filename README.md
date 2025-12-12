@@ -2,6 +2,10 @@
 
 A powerful HTTP Request Smuggling testing tool written in Rust.
 
+## What is HTTP Request Smuggling?
+
+HTTP Request Smuggling is a technique for interfering with the way a web application processes HTTP requests from multiple users. It exploits discrepancies in how front-end and back-end servers parse HTTP requests, particularly when they disagree on the boundaries between requests. This can lead to serious security vulnerabilities including bypassing security controls, gaining unauthorized access, and poisoning web caches.
+
 ```
 smugglex https://target.com/
 11:27PM INF start scan to https://target.com/

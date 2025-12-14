@@ -1,5 +1,9 @@
 <div align="center">
-    <img alt="smuggleX Logo" src="docs/static/images/logo.png" width="500px;">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/static/images/smugglex-dark.png" width="500px;">
+      <source media="(prefers-color-scheme: light)" srcset="docs/static/images/smugglex-light.png" width="500px;">
+      <img alt="SmuggleX Logo" src="docs/static/images/smugglex-dark.png" width="500px;">
+    </picture>
     <p>A powerful HTTP Request Smuggling testing tool written in Rust.</p>
 </div>
 

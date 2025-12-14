@@ -1,6 +1,16 @@
-# smugglex
+<div align="center">
+    <img alt="smuggleX Logo" src="docs/static/images/logo.png" width="500px;">
+    <p>A powerful HTTP Request Smuggling testing tool written in Rust.</p>
+</div>
 
-A powerful HTTP Request Smuggling testing tool written in Rust.
+<p align="center">
+<a href="https://github.com/hahwul/smugglex/blob/main/CONTRIBUTING.md">
+<img src="https://img.shields.io/badge/CONTRIBUTIONS-WELCOME-000000?style=for-the-badge&labelColor=black"></a>
+<a href="https://github.com/hahwul/smugglex/releases">
+<img src="https://img.shields.io/github/v/release/hahwul/smugglex?style=for-the-badge&color=black&labelColor=black&logo=web"></a>
+<a href="https://rust-lang.org">
+<img src="https://img.shields.io/badge/Crystal-000000?style=for-the-badge&logo=rust&logoColor=white"></a>
+</p>
 
 ## What is HTTP Request Smuggling?
 

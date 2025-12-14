@@ -1,0 +1,36 @@
+---
+name: smugglex
+summary: A powerful HTTP Request Smuggling testing tool written in Rust.
+description: |
+  Smugglex is a security testing tool that detects HTTP Request Smuggling vulnerabilities in web applications. The tool tests for multiple attack types including CL.TE, TE.CL, TE.TE, H2C, and H2 smuggling.
+
+  HTTP Request Smuggling exploits differences in how front-end and back-end servers parse HTTP requests. When servers disagree on request boundaries, attackers can smuggle malicious requests through security controls. This leads to security vulnerabilities such as bypassing firewalls, poisoning caches, and accessing unauthorized resources.
+
+  Key Features:
+  - Detect multiple attack types: CL.TE, TE.CL, TE.TE, H2C, and H2
+  - Test 40+ variations of Transfer-Encoding header obfuscations
+  - Support HTTP/2 protocol-level desync detection
+  - Export vulnerable payloads for manual verification
+  - Save scan results in JSON format
+  - Read URLs from stdin for pipeline integration
+  - Configure custom headers, cookies, and virtual hosts
+base: core22
+grade: stable
+confinement: strict
+license: MIT
+version: 0.0.1
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+  - build-on: armhf
+  - build-on: i386
+
+apps:
+  smugglex:
+    command: bin/smugglex
+    plugs: [home, network]
+
+parts:
+  smugglex:
+    source: .
+    plugin: rust

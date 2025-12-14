@@ -2,7 +2,17 @@ use clap::Parser;
 
 /// HTTP Request Smuggling tester
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None, before_help = r#"
+
+        ████
+       ██   █
+       ██   █
+        ██ █████         SmuggleX
+    ████ ██   ██   HTTP Request Smuggler
+   ███   ███   ██
+    ███  ███ ███
+      █   █  ██
+"#)]
 pub struct Cli {
     /// Target URLs
     pub urls: Vec<String>,
@@ -47,4 +57,3 @@ pub struct Cli {
     #[arg(short = '1', long = "exit-first", action = clap::ArgAction::SetTrue)]
     pub exit_first: bool,
 }
-

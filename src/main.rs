@@ -190,8 +190,7 @@ fn log_scan_results(results: &[CheckResult], format: &OutputFormat, target_url: 
 }
 
 fn log_plain_results(results: &[CheckResult], vulnerable_count: usize) {
-        // Plain text output
-        if vulnerable_count > 0 {
+    if vulnerable_count > 0 {
             log(
                 LogLevel::Warning,
                 &format!("smuggling found {} vulnerability(ies)", vulnerable_count),

@@ -1,4 +1,30 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+use std::fmt;
+
+/// Output format type
+#[derive(Debug, Clone, ValueEnum)]
+pub enum OutputFormat {
+    /// Plain text output (human-readable)
+    Plain,
+    /// JSON output (structured)
+    Json,
+}
+
+impl fmt::Display for OutputFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OutputFormat::Plain => write!(f, "plain"),
+            OutputFormat::Json => write!(f, "json"),
+        }
+    }
+}
+
+impl OutputFormat {
+    /// Check if format is JSON
+    pub fn is_json(&self) -> bool {
+        matches!(self, OutputFormat::Json)
+    }
+}
 
 /// HTTP Request Smuggling tester
 #[derive(Parser, Debug)]
@@ -56,4 +82,8 @@ pub struct Cli {
     /// Exit quickly after finding the first vulnerability
     #[arg(short = '1', long = "exit-first", action = clap::ArgAction::SetTrue)]
     pub exit_first: bool,
+
+    /// Output format (plain or json)
+    #[arg(short = 'f', long = "format", default_value_t = OutputFormat::Plain)]
+    pub format: OutputFormat,
 }

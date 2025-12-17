@@ -10,7 +10,7 @@
 //! - HTTP method variations
 
 use clap::Parser;
-use smugglex::cli::Cli;
+use smugglex::cli::{Cli, OutputFormat};
 
 #[test]
 fn test_single_url_parsing() {
@@ -198,6 +198,37 @@ fn test_no_export_payloads_option() {
     assert_eq!(cli.export_dir, None, "export_dir should be None by default");
 }
 
+// Test format option
+#[test]
+fn test_format_default_plain() {
+    let cli = Cli::parse_from(&["smugglex", "http://example.com"]);
+    assert!(matches!(cli.format, OutputFormat::Plain), "Default format should be plain");
+}
+
+#[test]
+fn test_format_short_flag() {
+    let cli = Cli::parse_from(&["smugglex", "http://example.com", "-f", "json"]);
+    assert!(matches!(cli.format, OutputFormat::Json), "format should be json with -f json flag");
+}
+
+#[test]
+fn test_format_long_flag() {
+    let cli = Cli::parse_from(&["smugglex", "http://example.com", "--format", "json"]);
+    assert!(matches!(cli.format, OutputFormat::Json), "format should be json with --format json flag");
+}
+
+#[test]
+fn test_format_plain_explicit() {
+    let cli = Cli::parse_from(&["smugglex", "http://example.com", "--format", "plain"]);
+    assert!(matches!(cli.format, OutputFormat::Plain), "format should be plain when explicitly set");
+}
+
+#[test]
+fn test_format_invalid_value() {
+    let result = Cli::try_parse_from(&["smugglex", "http://example.com", "--format", "invalid"]);
+    assert!(result.is_err(), "format should reject invalid values");
+}
+
 // Test exit-first option
 #[test]
 fn test_exit_first_short_flag() {
@@ -243,6 +274,8 @@ fn test_all_options_combined() {
         "--export-payloads",
         "./exports",
         "-1",
+        "-f",
+        "json",
     ]);
 
     assert_eq!(cli.urls.len(), 1);
@@ -256,6 +289,7 @@ fn test_all_options_combined() {
     assert!(cli.use_cookies);
     assert_eq!(cli.export_dir, Some("./exports".to_string()));
     assert!(cli.exit_first);
+    assert!(matches!(cli.format, OutputFormat::Json));
 }
 
 // Test HTTPS URLs

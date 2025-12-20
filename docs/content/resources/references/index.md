@@ -255,19 +255,19 @@ This page provides links to research papers, security advisories, tools, and edu
 ### HTTP Protocol Specifications
 
 **RFC 7230 - HTTP/1.1 Message Syntax and Routing**
-- [Read the RFC](https://tools.ietf.org/html/rfc7230)
+- [Read the RFC](https://www.rfc-editor.org/rfc/rfc7230)
 - Defines Content-Length and Transfer-Encoding
 - Conflict resolution rules
 - Official specification
 
 **RFC 7231 - HTTP/1.1 Semantics and Content**
-- [Read the RFC](https://tools.ietf.org/html/rfc7231)
+- [Read the RFC](https://www.rfc-editor.org/rfc/rfc7231)
 - HTTP methods and headers
 - Status codes
 - Request/response semantics
 
 **RFC 7540 - HTTP/2**
-- [Read the RFC](https://tools.ietf.org/html/rfc7540)
+- [Read the RFC](https://www.rfc-editor.org/rfc/rfc7540)
 - HTTP/2 specification
 - Binary framing
 - Multiplexing

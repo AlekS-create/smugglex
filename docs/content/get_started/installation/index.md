@@ -27,6 +27,48 @@ Install smugglex using Snap:
 snap install smugglex
 ```
 
+### Nix (Linux and macOS)
+
+Install smugglex using Nix package manager:
+
+#### Run Directly
+
+Run smugglex without installation:
+
+```bash
+nix run github:hahwul/smugglex
+```
+
+#### Install to Profile
+
+Install smugglex permanently to your Nix profile:
+
+```bash
+nix profile install github:hahwul/smugglex
+```
+
+#### Build Locally
+
+Clone and build from source using Nix:
+
+```bash
+git clone https://github.com/hahwul/smugglex
+cd smugglex
+nix build
+./result/bin/smugglex
+```
+
+#### Development Environment
+
+Enter a development shell with all dependencies:
+
+```bash
+cd smugglex
+nix develop
+```
+
+This provides rust-analyzer, cargo-watch, and other development tools.
+
 ### Debian Package (.deb)
 
 Download and install the Debian package from the [GitHub releases page](https://github.com/hahwul/smugglex/releases):

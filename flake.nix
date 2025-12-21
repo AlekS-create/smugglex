@@ -17,9 +17,9 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
-        
+
         rustToolchain = pkgs.rust-bin.stable.latest.default;
-        
+
         rustPlatform = pkgs.makeRustPlatform {
           cargo = rustToolchain;
           rustc = rustToolchain;
@@ -30,7 +30,7 @@
           smugglex = rustPlatform.buildRustPackage {
             pname = "smugglex";
             # Note: Version should be updated manually when releasing new versions
-            version = "0.0.1";
+            version = "0.1.0";
 
             src = ./.;
 

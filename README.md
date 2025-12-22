@@ -58,20 +58,12 @@ cat urls.txt | smugglex
 
 For detailed usage and options, see [Usage Guide](https://smugglex.hahwul.com/usage).
 
-## Configuration
-
-Run `smugglex --help` for all command-line options.
-
-Attack types: CL.TE, TE.CL, TE.TE, H2C, H2
-
 ## Examples
 
 ```bash
 smugglex https://target.com -v -o results.json
 cat urls.txt | smugglex --exit-first
 ```
-
-For more examples, see [Examples](https://smugglex.hahwul.com/examples).
 
 ## Troubleshooting
 

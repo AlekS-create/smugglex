@@ -393,3 +393,47 @@ fn test_invalid_checks_format() {
     let cli = Cli::parse_from(&["smugglex", "http://example.com", "-c", "invalid-check"]);
     assert_eq!(cli.checks, Some("invalid-check".to_string()));
 }
+
+#[test]
+fn test_exploit_option() {
+    let cli = Cli::parse_from(&["smugglex", "http://example.com", "--exploit", "localhost-access"]);
+    assert_eq!(cli.exploit, Some("localhost-access".to_string()));
+}
+
+#[test]
+fn test_exploit_option_short() {
+    let cli = Cli::parse_from(&["smugglex", "http://example.com", "-e", "localhost-access"]);
+    assert_eq!(cli.exploit, Some("localhost-access".to_string()));
+}
+
+#[test]
+fn test_exploit_option_none() {
+    let cli = Cli::parse_from(&["smugglex", "http://example.com"]);
+    assert_eq!(cli.exploit, None);
+}
+
+#[test]
+fn test_ports_option_default() {
+    let cli = Cli::parse_from(&["smugglex", "http://example.com"]);
+    assert_eq!(cli.ports, "22,80,443,8080,3306");
+}
+
+#[test]
+fn test_ports_option_custom() {
+    let cli = Cli::parse_from(&["smugglex", "http://example.com", "--ports", "80,443"]);
+    assert_eq!(cli.ports, "80,443");
+}
+
+#[test]
+fn test_exploit_with_custom_ports() {
+    let cli = Cli::parse_from(&[
+        "smugglex",
+        "http://example.com",
+        "--exploit",
+        "localhost-access",
+        "--ports",
+        "22,80,8080",
+    ]);
+    assert_eq!(cli.exploit, Some("localhost-access".to_string()));
+    assert_eq!(cli.ports, "22,80,8080");
+}

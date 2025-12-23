@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod error;
+pub mod exploit;
 pub mod http;
 pub mod model;
 pub mod payloads;

@@ -9,6 +9,7 @@ use url::Url;
 
 use smugglex::cli::{Cli, OutputFormat};
 use smugglex::error::Result;
+use smugglex::exploit::{extract_vulnerability_context, print_localhost_results, test_localhost_access};
 use smugglex::model::{CheckResult, ScanResults};
 use smugglex::payloads::{
     get_cl_te_payloads, get_h2_payloads, get_h2c_payloads, get_te_cl_payloads, get_te_te_payloads,
@@ -138,6 +139,30 @@ async fn process_url(target_url: &str, cli: &Cli) -> Result<()> {
 
     log_scan_results(&results, &cli.format, target_url, &cli.method);
 
+    // Run exploits if requested and vulnerabilities were found
+    if let Some(ref exploit_str) = cli.exploit {
+        if found_vulnerability {
+            run_exploits(
+                exploit_str,
+                &results,
+                host,
+                port,
+                path,
+                use_tls,
+                cli.timeout,
+                cli.verbose,
+                target_url,
+                &cli.ports,
+            )
+            .await?;
+        } else {
+            log(
+                LogLevel::Warning,
+                "exploit requested but no vulnerabilities found to exploit",
+            );
+        }
+    }
+
     if let Some(ref output_file) = cli.output {
         save_results_to_file(output_file, target_url, &cli.method, results)?;
     }
@@ -227,6 +252,104 @@ fn log_plain_results(results: &[CheckResult], vulnerable_count: usize) {
     } else {
         log(LogLevel::Info, "smuggling found 0 vulnerabilities");
     }
+}
+
+async fn run_exploits(
+    exploit_str: &str,
+    results: &[CheckResult],
+    host: &str,
+    port: u16,
+    path: &str,
+    use_tls: bool,
+    timeout: u64,
+    verbose: bool,
+    target_url: &str,
+    ports_str: &str,
+) -> Result<()> {
+    let exploits: Vec<&str> = exploit_str.split(',').map(|s| s.trim()).collect();
+
+    for exploit_type in exploits {
+        match exploit_type {
+            "localhost-access" => {
+                log(LogLevel::Info, "running localhost-access exploit");
+
+                // Extract vulnerability context from results
+                let vuln_ctx = match extract_vulnerability_context(results) {
+                    Some(ctx) => ctx,
+                    None => {
+                        log(
+                            LogLevel::Error,
+                            "cannot extract vulnerability context for exploitation",
+                        );
+                        continue;
+                    }
+                };
+
+                if verbose {
+                    println!(
+                        "\n{} Using detected {} vulnerability for exploitation",
+                        "[*]".cyan(),
+                        vuln_ctx.vuln_type.yellow().bold()
+                    );
+                }
+
+                // Parse target ports
+                let localhost_ports: Vec<u16> = ports_str
+                    .split(',')
+                    .filter_map(|s| s.trim().parse().ok())
+                    .collect();
+
+                if localhost_ports.is_empty() {
+                    log(LogLevel::Error, "no valid ports specified for localhost-access");
+                    continue;
+                }
+
+                if verbose {
+                    println!(
+                        "  {} Testing ports: {}",
+                        "[*]".cyan(),
+                        localhost_ports
+                            .iter()
+                            .map(|p| p.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    );
+                }
+
+                // Run localhost access test
+                match test_localhost_access(
+                    host,
+                    port,
+                    path,
+                    use_tls,
+                    timeout,
+                    verbose,
+                    &vuln_ctx,
+                    &localhost_ports,
+                )
+                .await
+                {
+                    Ok(localhost_results) => {
+                        print_localhost_results(&localhost_results, target_url);
+                    }
+                    Err(e) => {
+                        log(
+                            LogLevel::Error,
+                            &format!("localhost-access exploit failed: {}", e),
+                        );
+                    }
+                }
+            }
+            _ => {
+                log(
+                    LogLevel::Warning,
+                    &format!("unknown exploit type: {}", exploit_type),
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn save_results_to_file(

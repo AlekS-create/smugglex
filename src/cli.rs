@@ -86,4 +86,12 @@ pub struct Cli {
     /// Output format (plain or json)
     #[arg(short = 'f', long = "format", default_value_t = OutputFormat::Plain)]
     pub format: OutputFormat,
+
+    /// Exploit types to run after detection (comma-separated: localhost-access)
+    #[arg(short = 'e', long = "exploit")]
+    pub exploit: Option<String>,
+
+    /// Ports to test for localhost access exploit (comma-separated)
+    #[arg(long = "ports", default_value = "22,80,443,8080,3306")]
+    pub ports: String,
 }

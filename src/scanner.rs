@@ -159,9 +159,14 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
         if let (Some(export_dir), Some(payload_index), Some(payload)) =
             (params.export_dir, result_payload_index, &result_payload)
         {
-            if let Err(e) =
-                export_payload(export_dir, params.host, params.check_name, payload_index, payload, params.use_tls)
-            {
+            if let Err(e) = export_payload(
+                export_dir,
+                params.host,
+                params.check_name,
+                payload_index,
+                payload,
+                params.use_tls,
+            ) {
                 if params.verbose {
                     println!("  {} Failed to export payload: {}", "[!]".yellow(), e);
                 }

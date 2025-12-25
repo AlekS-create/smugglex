@@ -9,25 +9,25 @@ sort_by = "weight"
 
 ## Installation Methods
 
-### Homebrew (macOS and Linux)
+### Homebrew
 
 ```bash
 brew install hahwul/smugglex/smugglex
 ```
 
-### Snapcraft (Linux)
+### Snapcraft
 
 ```bash
 snap install smugglex
 ```
 
-### Nix (Linux and macOS)
+### Nix
 
 ```bash
 nix profile install github:hahwul/smugglex
 ```
 
-### Cargo (from crates.io)
+### Cargo
 
 ```bash
 cargo install smugglex

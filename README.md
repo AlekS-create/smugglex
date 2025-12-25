@@ -40,7 +40,7 @@ cd smugglex
 cargo install --path .
 ```
 
-For other installation methods, see [Installation Guide](https://smugglex.hahwul.com/installation).
+For other installation methods, see [Installation Guide](https://smugglex.hahwul.com/getting-started/installation/).
 
 ## Usage
 
@@ -56,7 +56,7 @@ Read URLs from stdin:
 cat urls.txt | smugglex
 ```
 
-For detailed usage and options, see [Usage Guide](https://smugglex.hahwul.com/usage).
+For detailed usage and options, see [Usage Guide](https://smugglex.hahwul.com/usage/).
 
 ## Examples
 
@@ -67,7 +67,7 @@ cat urls.txt | smugglex --exit-first
 
 ## Troubleshooting
 
-Common issues and solutions are available in the [Troubleshooting Guide](https://smugglex.hahwul.com/troubleshooting).
+Common issues and solutions are available in the [Troubleshooting Guide](https://smugglex.hahwul.com/support/troubleshooting/).
 
 ## References
 

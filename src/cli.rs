@@ -33,8 +33,8 @@ impl OutputFormat {
         ████
        ██   █
        ██   █
-        ██ █████         SmuggleX
-    ████ ██   ██   HTTP Request Smuggler
+        ██ █████               < SmuggleX >
+    ████ ██   ██   Rust-powered HTTP Smuggling Scanner.
    ███   ███   ██
     ███  ███ ███
       █   █  ██

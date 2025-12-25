@@ -1,5 +1,5 @@
 {
-  description = "A powerful HTTP Request Smuggling testing tool written in Rust";
+  description = "Rust-powered HTTP Smuggling Scanner";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -50,7 +50,7 @@
             ]);
 
             meta = with pkgs.lib; {
-              description = "A powerful HTTP Request Smuggling testing tool written in Rust";
+              description = "Rust-powered HTTP Smuggling Scanner";
               homepage = "https://github.com/hahwul/smugglex";
               license = licenses.mit;
               maintainers = [ ];

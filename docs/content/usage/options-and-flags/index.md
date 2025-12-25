@@ -252,19 +252,42 @@ The JSON output contains structured data:
 
 ```json
 {
-  "url": "https://target.com/",
-  "vulnerabilities": [
+  "target": "https://www.hahwul.com",
+  "method": "POST",
+  "timestamp": "2025-12-25T14:09:53.810614+00:00",
+  "checks": [
     {
-      "type": "TE.CL",
-      "payload_index": 0,
-      "timing": {
-        "normal": 1279,
-        "attack": 10000
-      },
-      "response": "Connection Timeout"
+      "check_type": "h2",
+      "vulnerable": false,
+      "payload_index": null,
+      "normal_status": "HTTP/1.1 200 OK",
+      "attack_status": null,
+      "normal_duration_ms": 81,
+      "attack_duration_ms": null,
+      "timestamp": "2025-12-25T14:09:53.810528+00:00"
     }
-  ],
-  "scan_time": 141.099
+  ]
+}
+```
+
+```json
+{
+  "target": "https://0a8f00fe036a320c80b08fa900bb0095.web-security-academy.net",
+  "method": "POST",
+  "timestamp": "2025-12-25T14:12:26.375085+00:00",
+  "checks": [
+    {
+      "check_type": "cl-te",
+      "vulnerable": true,
+      "payload_index": 0,
+      "normal_status": "HTTP/1.1 200 OK",
+      "attack_status": "Connection Timeout",
+      "normal_duration_ms": 1358,
+      "attack_duration_ms": 10000,
+      "timestamp": "2025-12-25T14:12:26.375022+00:00",
+      "payload": "POST / HTTP/1.1\r\nHost: 0a8f00fe036a320c80b08fa900bb0095.web-security-academy.net\r\nConnection: keep-alive\r\nContent-Length: 6\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nG"
+    }
+  ]
 }
 ```
 

@@ -10,15 +10,30 @@ use url::Url;
 use smugglex::cli::{Cli, OutputFormat};
 use smugglex::error::Result;
 use smugglex::exploit::{
-    extract_vulnerability_context, get_fuzz_paths, print_localhost_results, print_path_fuzz_results,
-    test_localhost_access, test_path_fuzz,
+    LocalhostAccessParams, extract_vulnerability_context, get_fuzz_paths, print_localhost_results,
+    print_path_fuzz_results, test_localhost_access, test_path_fuzz,
 };
 use smugglex::model::{CheckResult, ScanResults};
 use smugglex::payloads::{
     get_cl_te_payloads, get_h2_payloads, get_h2c_payloads, get_te_cl_payloads, get_te_te_payloads,
 };
-use smugglex::scanner::{run_checks_for_type, CheckParams};
-use smugglex::utils::{fetch_cookies, log, LogLevel};
+use smugglex::scanner::{CheckParams, run_checks_for_type};
+use smugglex::utils::{LogLevel, fetch_cookies, log};
+
+#[derive(Debug)]
+struct ExploitParams<'a> {
+    exploit_str: &'a str,
+    results: &'a [CheckResult],
+    host: &'a str,
+    port: u16,
+    path: &'a str,
+    use_tls: bool,
+    timeout: u64,
+    verbose: bool,
+    target_url: &'a str,
+    ports_str: &'a str,
+    wordlist_path: Option<&'a str>,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -82,13 +97,19 @@ async fn process_url(target_url: &str, cli: &Cli) -> Result<()> {
         Vec::new()
     };
     if !cookies.is_empty() {
-        log(LogLevel::Info, &format!("found {} cookie(s)", cookies.len()));
+        log(
+            LogLevel::Info,
+            &format!("found {} cookie(s)", cookies.len()),
+        );
     }
 
     let pb = setup_progress_bar(cli.verbose);
 
     let all_checks = [
-        ("cl-te", get_cl_te_payloads as fn(&str, &str, &str, &[String], &[String]) -> Vec<String>),
+        (
+            "cl-te",
+            get_cl_te_payloads as fn(&str, &str, &str, &[String], &[String]) -> Vec<String>,
+        ),
         ("te-cl", get_te_cl_payloads),
         ("te-te", get_te_te_payloads),
         ("h2c", get_h2c_payloads),
@@ -145,20 +166,20 @@ async fn process_url(target_url: &str, cli: &Cli) -> Result<()> {
     // Run exploits if requested and vulnerabilities were found
     if let Some(ref exploit_str) = cli.exploit {
         if found_vulnerability {
-            run_exploits(
+            let exploit_params = ExploitParams {
                 exploit_str,
-                &results,
+                results: &results,
                 host,
                 port,
                 path,
                 use_tls,
-                cli.timeout,
-                cli.verbose,
+                timeout: cli.timeout,
+                verbose: cli.verbose,
                 target_url,
-                &cli.exploit_ports,
-                cli.exploit_wordlist.as_deref(),
-            )
-            .await?;
+                ports_str: &cli.exploit_ports,
+                wordlist_path: cli.exploit_wordlist.as_deref(),
+            };
+            run_exploits(&exploit_params).await?;
         } else {
             log(
                 LogLevel::Warning,
@@ -195,7 +216,12 @@ fn setup_progress_bar(verbose: bool) -> ProgressBar {
     }
 }
 
-fn log_scan_results(results: &[CheckResult], format: &OutputFormat, target_url: &str, method: &str) {
+fn log_scan_results(
+    results: &[CheckResult],
+    format: &OutputFormat,
+    target_url: &str,
+    method: &str,
+) {
     let vulnerable_count = results.iter().filter(|r| r.vulnerable).count();
 
     if format.is_json() {
@@ -208,7 +234,10 @@ fn log_scan_results(results: &[CheckResult], format: &OutputFormat, target_url: 
         match serde_json::to_string_pretty(&scan_results) {
             Ok(json_output) => println!("{}", json_output),
             Err(e) => {
-                log(LogLevel::Error, &format!("failed to serialize results to JSON: {}", e));
+                log(
+                    LogLevel::Error,
+                    &format!("failed to serialize results to JSON: {}", e),
+                );
                 log(LogLevel::Info, "falling back to plain text output");
                 log_plain_results(results, vulnerable_count);
             }
@@ -220,58 +249,46 @@ fn log_scan_results(results: &[CheckResult], format: &OutputFormat, target_url: 
 
 fn log_plain_results(results: &[CheckResult], vulnerable_count: usize) {
     if vulnerable_count > 0 {
-            log(
-                LogLevel::Warning,
-                &format!("smuggling found {} vulnerability(ies)", vulnerable_count),
+        log(
+            LogLevel::Warning,
+            &format!("smuggling found {} vulnerability(ies)", vulnerable_count),
+        );
+        println!();
+        for result in results.iter().filter(|r| r.vulnerable) {
+            println!(
+                "{}",
+                format!("=== {} Vulnerability Details ===", result.check_type).bold()
             );
-            println!();
-            for result in results.iter().filter(|r| r.vulnerable) {
-                println!(
-                    "{}",
-                    format!("=== {} Vulnerability Details ===", result.check_type).bold()
-                );
-                println!("{} {}", "Status:".bold(), "VULNERABLE".red().bold());
-                if let Some(idx) = result.payload_index {
-                    println!("{} {}", "Payload Index:".bold(), idx);
-                }
-                if let Some(ref status) = result.attack_status {
-                    println!("{} {}", "Attack Response:".bold(), status);
-                }
-                if let Some(attack_ms) = result.attack_duration_ms {
-                    println!(
-                        "{} Normal: {}ms, Attack: {}ms",
-                        "Timing:".bold(),
-                        result.normal_duration_ms,
-                        attack_ms
-                    );
-                }
-                if let Some(ref payload) = result.payload {
-                    println!("\n{}", "HTTP Raw Request:".bold());
-                    println!("{}", "─".repeat(60).dimmed());
-                    println!("{}", payload.cyan());
-                    println!("{}", "─".repeat(60).dimmed());
-                }
-                println!();
+            println!("{} {}", "Status:".bold(), "VULNERABLE".red().bold());
+            if let Some(idx) = result.payload_index {
+                println!("{} {}", "Payload Index:".bold(), idx);
             }
+            if let Some(ref status) = result.attack_status {
+                println!("{} {}", "Attack Response:".bold(), status);
+            }
+            if let Some(attack_ms) = result.attack_duration_ms {
+                println!(
+                    "{} Normal: {}ms, Attack: {}ms",
+                    "Timing:".bold(),
+                    result.normal_duration_ms,
+                    attack_ms
+                );
+            }
+            if let Some(ref payload) = result.payload {
+                println!("\n{}", "HTTP Raw Request:".bold());
+                println!("{}", "─".repeat(60).dimmed());
+                println!("{}", payload.cyan());
+                println!("{}", "─".repeat(60).dimmed());
+            }
+            println!();
+        }
     } else {
         log(LogLevel::Info, "smuggling found 0 vulnerabilities");
     }
 }
 
-async fn run_exploits(
-    exploit_str: &str,
-    results: &[CheckResult],
-    host: &str,
-    port: u16,
-    path: &str,
-    use_tls: bool,
-    timeout: u64,
-    verbose: bool,
-    target_url: &str,
-    ports_str: &str,
-    wordlist_path: Option<&str>,
-) -> Result<()> {
-    let exploits: Vec<&str> = exploit_str.split(',').map(|s| s.trim()).collect();
+async fn run_exploits(params: &ExploitParams<'_>) -> Result<()> {
+    let exploits: Vec<&str> = params.exploit_str.split(',').map(|s| s.trim()).collect();
 
     for exploit_type in exploits {
         match exploit_type {
@@ -279,7 +296,7 @@ async fn run_exploits(
                 log(LogLevel::Info, "running localhost-access exploit");
 
                 // Extract vulnerability context from results
-                let vuln_ctx = match extract_vulnerability_context(results) {
+                let vuln_ctx = match extract_vulnerability_context(params.results) {
                     Some(ctx) => ctx,
                     None => {
                         log(
@@ -290,7 +307,7 @@ async fn run_exploits(
                     }
                 };
 
-                if verbose {
+                if params.verbose {
                     println!(
                         "\n{} Using detected {} vulnerability for exploitation",
                         "[*]".cyan(),
@@ -299,17 +316,21 @@ async fn run_exploits(
                 }
 
                 // Parse target ports
-                let localhost_ports: Vec<u16> = ports_str
+                let localhost_ports: Vec<u16> = params
+                    .ports_str
                     .split(',')
                     .filter_map(|s| s.trim().parse::<u16>().ok())
                     .collect();
 
                 if localhost_ports.is_empty() {
-                    log(LogLevel::Error, "no valid ports specified for localhost-access");
+                    log(
+                        LogLevel::Error,
+                        "no valid ports specified for localhost-access",
+                    );
                     continue;
                 }
 
-                if verbose {
+                if params.verbose {
                     println!(
                         "  {} Testing ports: {}",
                         "[*]".cyan(),
@@ -322,20 +343,19 @@ async fn run_exploits(
                 }
 
                 // Run localhost access test
-                match test_localhost_access(
-                    host,
-                    port,
-                    path,
-                    use_tls,
-                    timeout,
-                    verbose,
-                    &vuln_ctx,
-                    &localhost_ports,
-                )
-                .await
-                {
+                let localhost_params = LocalhostAccessParams {
+                    host: params.host,
+                    port: params.port,
+                    path: params.path,
+                    use_tls: params.use_tls,
+                    timeout: params.timeout,
+                    verbose: params.verbose,
+                    vuln_ctx: &vuln_ctx,
+                    localhost_ports: &localhost_ports,
+                };
+                match test_localhost_access(&localhost_params).await {
                     Ok(localhost_results) => {
-                        print_localhost_results(&localhost_results, target_url);
+                        print_localhost_results(&localhost_results, params.target_url);
                     }
                     Err(e) => {
                         log(
@@ -349,7 +369,7 @@ async fn run_exploits(
                 log(LogLevel::Info, "running path-fuzz exploit");
 
                 // Extract vulnerability context from results
-                let vuln_ctx = match extract_vulnerability_context(results) {
+                let vuln_ctx = match extract_vulnerability_context(params.results) {
                     Some(ctx) => ctx,
                     None => {
                         log(
@@ -360,7 +380,7 @@ async fn run_exploits(
                     }
                 };
 
-                if verbose {
+                if params.verbose {
                     println!(
                         "\n{} Using detected {} vulnerability for exploitation",
                         "[*]".cyan(),
@@ -369,47 +389,43 @@ async fn run_exploits(
                 }
 
                 // Get paths to fuzz
-                let fuzz_paths = match get_fuzz_paths(wordlist_path) {
+                let fuzz_paths = match get_fuzz_paths(params.wordlist_path) {
                     Ok(paths) => paths,
                     Err(e) => {
-                        log(
-                            LogLevel::Error,
-                            &format!("failed to get fuzz paths: {}", e),
-                        );
+                        log(LogLevel::Error, &format!("failed to get fuzz paths: {}", e));
                         continue;
                     }
                 };
 
-                if verbose {
+                if params.verbose {
                     println!(
                         "  {} Testing {} paths{}",
                         "[*]".cyan(),
                         fuzz_paths.len(),
-                        wordlist_path.map_or("".to_string(), |p| format!(" from {}", p))
+                        params
+                            .wordlist_path
+                            .map_or("".to_string(), |p| format!(" from {}", p))
                     );
                 }
 
                 // Run path fuzz test
                 match test_path_fuzz(
-                    host,
-                    port,
-                    path,
-                    use_tls,
-                    timeout,
-                    verbose,
+                    params.host,
+                    params.port,
+                    params.path,
+                    params.use_tls,
+                    params.timeout,
+                    params.verbose,
                     &vuln_ctx,
                     &fuzz_paths,
                 )
                 .await
                 {
                     Ok(path_fuzz_results) => {
-                        print_path_fuzz_results(&path_fuzz_results, target_url);
+                        print_path_fuzz_results(&path_fuzz_results, params.target_url);
                     }
                     Err(e) => {
-                        log(
-                            LogLevel::Error,
-                            &format!("path-fuzz exploit failed: {}", e),
-                        );
+                        log(LogLevel::Error, &format!("path-fuzz exploit failed: {}", e));
                     }
                 }
             }

@@ -48,7 +48,9 @@ async fn check_single_payload(
 
             let status_code = {
                 let parts: Vec<&str> = attack_status_line.split_whitespace().collect();
-                if parts.len() >= 2 && (parts[0].starts_with("HTTP/1.") || parts[0].starts_with("HTTP/2")) {
+                if parts.len() >= 2
+                    && (parts[0].starts_with("HTTP/1.") || parts[0].starts_with("HTTP/2"))
+                {
                     parts[1].parse::<u16>().ok()
                 } else {
                     None
@@ -114,7 +116,12 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
             let percentage = (current as f64 / total_requests as f64 * 100.0) as u32;
             params.pb.set_message(format!(
                 "[{}/{}] checking {} ({}/{} - {}%)",
-                params.current_check, params.total_checks, params.check_name, current, total_requests, percentage
+                params.current_check,
+                params.total_checks,
+                params.check_name,
+                current,
+                total_requests,
+                percentage
             ));
         }
 
@@ -148,12 +155,23 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
         }
     }
 
-    let (vulnerable, result_payload_index, result_payload, result_attack_status, last_attack_duration) =
-        if let Some((i, payload, info)) = vulnerability_info {
-            (true, Some(i), Some(payload), Some(info.status), Some(info.duration))
-        } else {
-            (false, None, None, None, None)
-        };
+    let (
+        vulnerable,
+        result_payload_index,
+        result_payload,
+        result_attack_status,
+        last_attack_duration,
+    ) = if let Some((i, payload, info)) = vulnerability_info {
+        (
+            true,
+            Some(i),
+            Some(payload),
+            Some(info.status),
+            Some(info.duration),
+        )
+    } else {
+        (false, None, None, None, None)
+    };
 
     if vulnerable {
         if let (Some(export_dir), Some(payload_index), Some(payload)) =
@@ -186,4 +204,3 @@ pub async fn run_checks_for_type(params: CheckParams<'_>) -> Result<CheckResult>
         payload: result_payload,
     })
 }
-

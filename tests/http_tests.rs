@@ -34,12 +34,6 @@ async fn mock_server(port: u16, response: &str) {
     });
 }
 
-// Mock HTTPS server (simplified - in real tests, use proper TLS setup)
-async fn mock_https_server(_port: u16, _response: &str) {
-    // For simplicity, we'll skip full HTTPS mocking in unit tests
-    // In integration tests, use a proper test server
-}
-
 #[tokio::test]
 async fn test_send_request_http_success() {
     let port = 8080;
@@ -63,7 +57,6 @@ async fn test_send_request_http_success() {
     let (response, duration) = result.unwrap();
     assert!(response.contains("HTTP/1.1 200 OK"));
     assert!(response.contains(response_body));
-    assert!(duration.as_millis() >= 0);
 }
 
 #[tokio::test]

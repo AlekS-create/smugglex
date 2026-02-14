@@ -5,6 +5,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio::sync::Mutex;
+use tokio::time;
 use tokio_rustls::TlsConnector;
 
 use crate::error::Result;
@@ -19,6 +21,13 @@ static TLS_CONFIG: Lazy<Arc<rustls::ClientConfig>> = Lazy::new(|| {
             .with_root_certificates(root_store)
             .with_no_client_auth(),
     )
+});
+
+// Rate limiting: 1 request per 2 seconds
+const REQUEST_DELAY_MS: u64 = 2000;
+static RATE_LIMITER: Lazy<Mutex<Instant>> = Lazy::new(|| {
+    // Инициализируем с запасом, чтобы первый запрос не ждал
+    Mutex::new(Instant::now() - Duration::from_millis(REQUEST_DELAY_MS))
 });
 
 /// A trait that combines AsyncRead and AsyncWrite.
@@ -53,6 +62,21 @@ pub async fn send_request(
     verbose: bool,
     use_tls: bool,
 ) -> Result<(String, Duration)> {
+    // === RATE LIMITING: 1 request per 2 seconds ===
+    {
+        let mut last_request = RATE_LIMITER.lock().await;
+        let now = Instant::now();
+        let elapsed = now.duration_since(*last_request);
+
+        if elapsed < Duration::from_millis(REQUEST_DELAY_MS) {
+            let sleep_duration = Duration::from_millis(REQUEST_DELAY_MS) - elapsed;
+            time::sleep(sleep_duration).await;
+        }
+
+        *last_request = Instant::now();
+    }
+    // === END RATE LIMITING ===
+
     if verbose {
         println!("\n{}", "--- REQUEST ---".bold().blue());
         println!("{}", request.cyan());
@@ -76,4 +100,3 @@ pub async fn send_request(
 
     Ok((response_str, duration))
 }
-
